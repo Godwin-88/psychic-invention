@@ -9,6 +9,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 pyo3 = { version = "0.17", features = ["extension-module", "macros"] }
+statrs = "0.15.0"    # for normal CDF (Gaussian)
 numpy = "0.17"  
 rand = "0.9.1"
 rayon = "1.7"
