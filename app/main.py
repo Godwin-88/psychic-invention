@@ -8,5 +8,7 @@ def main():
     print(f"Call: {call:.4f}, Put: {put:.4f}")
 
 if __name__ == '__main__':
-    print('BS call:', pricing_engine.price_call(100,100,1,0.05,0.2))
-    print('MC call:', pricing_engine.price_call_mc(100,100,1,0.05,0.2,100000))
+    #print('BS call:', pricing_engine.price_call(100,100,1,0.05,0.2))
+    #print('MC call:', pricing_engine.price_call_mc(100,100,1,0.05,0.2,100000))
+    fft_prices = pricing_engine.price_call_fft(100, -5.0, 0.1, 256, 1.0, 0.05, 0.2, 1.5)
+    print(f"FFT prices sample: {fft_prices[:5]}")
