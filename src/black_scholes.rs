@@ -1,5 +1,5 @@
 use pyo3::prelude::*;
-use statrs::distribution::{Normal, Univariate};
+use statrs::distribution::{Normal, ContinuousCDF};
 
 /// Compute the Black-Scholes price of a European call option.
 #[pyfunction]
