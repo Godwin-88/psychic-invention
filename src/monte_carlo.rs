@@ -25,3 +25,19 @@ pub fn price_call_mc(
     let mean = sum / sims as f64;
     Ok((-r * tau).exp() * mean)
 }
+
+/// Monte Carlo pricing of a European put option via put-call parity
+#[pyfunction]
+pub fn price_put_mc(
+    s: f64,
+    k: f64,
+    tau: f64,
+    r: f64,
+    sigma: f64,
+    sims: usize
+) -> PyResult<f64> {
+    // Compute call price then apply P = C - S + K * exp(-r * tau)
+    let c = price_call_mc(s, k, tau, r, sigma, sims)?;
+    let p = c - s + k * (-r * tau).exp();
+    Ok(p)
+}
