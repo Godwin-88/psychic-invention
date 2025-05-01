@@ -1,23 +1,27 @@
+import math
 import pytest
 import pricing_engine
 
-# FFT should approximate Black-Scholes value within tolerance
-def test_fft_pricing():
-    # Generate 256 option prices over log-strike grid
-    prices = pricing_engine.price_call_fft(100, -5.0, 0.1, 256, 1.0, 0.05, 0.2, 1.5)
-    assert isinstance(prices, list)
-    assert len(prices) == 256
-    # Check positivity and reasonable magnitude
-    assert all(p >= 0.0 for p in prices)
+def test_call_fft_vs_bs_call():
+    s, tau, r, sigma, alpha = 100.0, 1.0, 0.05, 0.2, 1.5
+    k_min, eta, n = 50.0, 1.0, 100  # strike range: 50,51,...,149
 
+    bs_call = pricing_engine.price_call(100, 100, tau, r, sigma)
+    fft_calls = pricing_engine.price_call_fft(s, k_min, eta, n, tau, r, sigma, alpha)
+    
+    idx = int(round((100.0 - k_min) / eta))
+    fft_call = fft_calls[idx]
 
+    assert abs(fft_call - bs_call) < 1e-2, f"FFT call {fft_call} vs BS {bs_call}"
 
 def test_put_fft_vs_bs_put():
-    # analytic BS put
-    bs_put = pricing_engine.price_put(100, 100, 1.0, 0.05, 0.2)
-    # FFT put
-    fft_puts = pricing_engine.price_put_fft(100, -5.0, 0.1, 256, 1.0, 0.05, 0.2, 1.5)
-    # locate K=100 in the grid: index = (100 - k_min)/eta = (100 + 5)/0.1 = 1050
-    idx = int(round((100.0 - (-5.0)) / 0.1))
+    s, tau, r, sigma, alpha = 100.0, 1.0, 0.05, 0.2, 1.5
+    k_min, eta, n = 50.0, 1.0, 100  # strike range: 50,51,...,149
+
+    bs_put = pricing_engine.price_put(100, 100, tau, r, sigma)
+    fft_puts = pricing_engine.price_put_fft(s, k_min, eta, n, tau, r, sigma, alpha)
+
+    idx = int(round((100.0 - k_min) / eta))
     fft_put = fft_puts[idx]
-    assert abs(fft_put - bs_put) < 1e-2
+
+    assert abs(fft_put - bs_put) < 1e-2, f"FFT put {fft_put} vs BS {bs_put}"

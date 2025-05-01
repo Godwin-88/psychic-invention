@@ -22,10 +22,8 @@ pub fn price_call_fft(
     let mut input = Vec::with_capacity(n);
     for j in 0..n {
         let v = j as f64 * eta;
-        // Characteristic function for log stock under GBM
         let mu = (s.ln()) + (r - 0.5 * sigma * sigma) * tau;
         let cf = (Complex::i() * v * mu - Complex::from(0.5 * sigma * sigma * v * v * tau)).exp();
-        // Damped payoff transform
         let numerator = cf * Complex::new(eta * f64::exp(-r * tau), 0.0);
         let denom = Complex::i() * v + alpha;
         let denom2 = Complex::i() * v + alpha + 1.0;
@@ -47,28 +45,24 @@ pub fn price_call_fft(
     Ok(prices)
 }
 
-/// FFT-based Carr–Madan pricing for European put options via parity:
-/// P(K) = C(K) - S + K e^{-r τ}
+/// FFT-based Carr–Madan pricing for European put options via put-call parity
 #[pyfunction]
 pub fn price_put_fft(
     s: f64,
-    eta: f64,
     k_min: f64,
+    eta: f64,
     n: usize,
     tau: f64,
     r: f64,
     sigma: f64,
     alpha: f64
 ) -> PyResult<Vec<f64>> {
-    // First compute calls
     let call_prices = price_call_fft(s, k_min, eta, n, tau, r, sigma, alpha)?;
-    // Convert into puts
     let mut put_prices = Vec::with_capacity(n);
-    for (j, &c) in call_prices.iter().enumerate() {
+    for (j, &call) in call_prices.iter().enumerate() {
         let k_j = k_min + j as f64 * eta;
-        let p = c - s + k_j * (-r * tau).exp();
-        put_prices.push(p);
+        let put = call - s + k_j * (-r * tau).exp();
+        put_prices.push(put);
     }
     Ok(put_prices)
 }
-
