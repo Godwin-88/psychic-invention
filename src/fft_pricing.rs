@@ -46,3 +46,29 @@ pub fn price_call_fft(
 
     Ok(prices)
 }
+
+/// FFT-based Carr–Madan pricing for European put options via parity:
+/// P(K) = C(K) - S + K e^{-r τ}
+#[pyfunction]
+pub fn price_put_fft(
+    s: f64,
+    eta: f64,
+    k_min: f64,
+    n: usize,
+    tau: f64,
+    r: f64,
+    sigma: f64,
+    alpha: f64
+) -> PyResult<Vec<f64>> {
+    // First compute calls
+    let call_prices = price_call_fft(s, k_min, eta, n, tau, r, sigma, alpha)?;
+    // Convert into puts
+    let mut put_prices = Vec::with_capacity(n);
+    for (j, &c) in call_prices.iter().enumerate() {
+        let k_j = k_min + j as f64 * eta;
+        let p = c - s + k_j * (-r * tau).exp();
+        put_prices.push(p);
+    }
+    Ok(put_prices)
+}
+
