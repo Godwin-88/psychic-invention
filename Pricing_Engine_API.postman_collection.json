@@ -1,0 +1,563 @@
+{
+	"info": {
+		"_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+		"name": "Derivatives Pricing Engine API",
+		"description": "Complete API test suite for the high-performance derivatives pricing engine with Black-Scholes, Monte Carlo, FFT, and Heston models.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "12345678"
+	},
+	"item": [
+		{
+			"name": "Health & Status",
+			"item": [
+				{
+					"name": "Health Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/health",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"health"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "API Root",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								""
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Black-Scholes Pricing",
+			"item": [
+				{
+					"name": "BS Call - ATM",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"s\": 100.0,\n  \"k\": 100.0,\n  \"tau\": 1.0,\n  \"r\": 0.05,\n  \"sigma\": 0.2\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/price/call/bs",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"price",
+								"call",
+								"bs"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "BS Put - ATM",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"s\": 100.0,\n  \"k\": 100.0,\n  \"tau\": 1.0,\n  \"r\": 0.05,\n  \"sigma\": 0.2\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/price/put/bs",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"price",
+								"put",
+								"bs"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "BS Call - ITM",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"s\": 110.0,\n  \"k\": 100.0,\n  \"tau\": 0.25,\n  \"r\": 0.05,\n  \"sigma\": 0.25\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/price/call/bs",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"price",
+								"call",
+								"bs"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "BS Put - OTM",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"s\": 95.0,\n  \"k\": 100.0,\n  \"tau\": 0.5,\n  \"r\": 0.03,\n  \"sigma\": 0.18\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/price/put/bs",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"price",
+								"put",
+								"bs"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "FFT Pricing (Fixed)",
+			"item": [
+				{
+					"name": "FFT Call - Standard Parameters",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"s\": 100.0,\n  \"k_min\": 4.0,\n  \"delta_v\": 0.01,\n  \"delta_k\": 0.0015339807878856412,\n  \"n\": 4096,\n  \"tau\": 1.0,\n  \"r\": 0.05,\n  \"sigma\": 0.2,\n  \"alpha\": 1.5\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/price/call/fft",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"price",
+								"call",
+								"fft"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "FFT Put - Standard Parameters",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"s\": 100.0,\n  \"k_min\": 4.0,\n  \"delta_v\": 0.01,\n  \"delta_k\": 0.0015339807878856412,\n  \"n\": 4096,\n  \"tau\": 1.0,\n  \"r\": 0.05,\n  \"sigma\": 0.2,\n  \"alpha\": 1.5\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/price/put/fft",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"price",
+								"put",
+								"fft"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "FFT Call - High Volatility",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"s\": 100.0,\n  \"k_min\": 3.5,\n  \"delta_v\": 0.008,\n  \"delta_k\": 0.0019174759848570515,\n  \"n\": 4096,\n  \"tau\": 0.25,\n  \"r\": 0.05,\n  \"sigma\": 0.4,\n  \"alpha\": 1.2\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/price/call/fft",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"price",
+								"call",
+								"fft"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Error Handling",
+			"item": [
+				{
+					"name": "Invalid Parameters - Negative Volatility",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"s\": 100.0,\n  \"k\": 100.0,\n  \"tau\": 1.0,\n  \"r\": 0.05,\n  \"sigma\": -0.2\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/price/call/bs",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"price",
+								"call",
+								"bs"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Invalid Parameters - Zero Time",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"s\": 100.0,\n  \"k\": 100.0,\n  \"tau\": 0.0,\n  \"r\": 0.05,\n  \"sigma\": 0.2\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/price/call/bs",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"price",
+								"call",
+								"bs"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Missing Required Fields",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"s\": 100.0,\n  \"k\": 100.0\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/price/call/bs",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"price",
+								"call",
+								"bs"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Performance Tests",
+			"item": [
+				{
+					"name": "BS Call - Performance Test",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"s\": 150.25,\n  \"k\": 155.0,\n  \"tau\": 0.0833,\n  \"r\": 0.0525,\n  \"sigma\": 0.28\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/price/call/bs",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"price",
+								"call",
+								"bs"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "FFT Call - Large Grid",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"s\": 100.0,\n  \"k_min\": 3.0,\n  \"delta_v\": 0.005,\n  \"delta_k\": 0.0030679615757712823,\n  \"n\": 2048,\n  \"tau\": 1.0,\n  \"r\": 0.05,\n  \"sigma\": 0.2,\n  \"alpha\": 1.5\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/price/call/fft",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"price",
+								"call",
+								"fft"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Real Market Scenarios",
+			"item": [
+				{
+					"name": "AAPL-like Option (High Vol)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"s\": 175.50,\n  \"k\": 180.0,\n  \"tau\": 0.0411,\n  \"r\": 0.0525,\n  \"sigma\": 0.35\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/price/call/bs",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"price",
+								"call",
+								"bs"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "SPY-like Option (Low Vol)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"s\": 450.25,\n  \"k\": 455.0,\n  \"tau\": 0.0192,\n  \"r\": 0.0525,\n  \"sigma\": 0.12\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/price/put/bs",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"price",
+								"put",
+								"bs"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Crypto Option (Extreme Vol)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"s\": 42500.0,\n  \"k\": 45000.0,\n  \"tau\": 0.0833,\n  \"r\": 0.05,\n  \"sigma\": 0.8\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/price/call/bs",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"price",
+								"call",
+								"bs"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Set timestamp for performance tracking",
+					"pm.globals.set('requestStartTime', Date.now());"
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Basic response validation",
+					"pm.test('Status code is 200', function () {",
+					"    pm.response.to.have.status(200);",
+					"});",
+					"",
+					"pm.test('Response time is less than 1000ms', function () {",
+					"    pm.expect(pm.response.responseTime).to.be.below(1000);",
+					"});",
+					"",
+					"pm.test('Response has valid JSON', function () {",
+					"    pm.response.to.be.json;",
+					"});",
+					"",
+					"// Pricing-specific validations",
+					"if (pm.request.url.path.includes('price')) {",
+					"    pm.test('Price is positive number', function () {",
+					"        const jsonData = pm.response.json();",
+					"        if (jsonData.price !== undefined) {",
+					"            pm.expect(jsonData.price).to.be.a('number');",
+					"            pm.expect(jsonData.price).to.be.above(0);",
+					"        }",
+					"        if (jsonData.prices !== undefined) {",
+					"            pm.expect(jsonData.prices).to.be.an('array');",
+					"            pm.expect(jsonData.prices.length).to.be.above(0);",
+					"        }",
+					"    });",
+					"    ",
+					"    pm.test('Has model information', function () {",
+					"        const jsonData = pm.response.json();",
+					"        if (jsonData.model !== undefined) {",
+					"            pm.expect(jsonData.model).to.be.a('string');",
+					"        }",
+					"    });",
+					"}",
+					"",
+					"// Performance tracking",
+					"const responseTime = pm.response.responseTime;",
+					"console.log(`Response time: ${responseTime}ms`);",
+					"",
+					"// Log response for debugging",
+					"console.log('Response:', pm.response.json());"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8000",
+			"type": "string"
+		}
+	]
+}
