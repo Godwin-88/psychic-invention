@@ -1,43 +1,61 @@
+import { NavLink, useNavigate } from 'react-router-dom';
 import { Button } from './Button';
 import { useHealthCheck } from '@/hooks/useApi';
 
+const navLinks = [
+  { label: 'Marketplace', to: '/marketplace' },
+  { label: 'Workspace', to: '/workspace' },
+  { label: 'FFT Surface', to: '/fft' },
+  { label: 'Ops Centre', to: '/operations' },
+  { label: 'API', to: '/api-playground' },
+];
+
 export const Header = () => {
   const { isHealthy } = useHealthCheck();
+  const navigate = useNavigate();
 
   return (
-    <header className="bg-slate-900 border-b border-slate-700 sticky top-0 z-50">
+    <header className="bg-slate-950/80 backdrop-blur border-b border-slate-800 sticky top-0 z-50">
       <div className="container">
-        <div className="flex justify-between items-center h-16">
-          {/* Logo */}
-          <div className="flex items-center">
-            <h1 className="text-2xl font-bold text-white">
+        <div className="flex flex-wrap items-center justify-between gap-4 py-4">
+          <div>
+            <h1 className="text-2xl font-bold text-white flex items-center gap-2">
               ⚡ <span className="glow-text">PricingEngine</span>
             </h1>
+            <p className="text-xs text-slate-500 uppercase tracking-widest">Rust · FastAPI · React Dashboard</p>
           </div>
 
-          {/* Navigation */}
-          <nav className="hidden md:flex space-x-8">
-            <a href="#features" className="text-slate-300 hover:text-blue-400 px-3 py-2 text-sm font-medium transition-colors">
-              Models
-            </a>
-            <a href="#demo" className="text-slate-300 hover:text-blue-400 px-3 py-2 text-sm font-medium transition-colors">
-              Live Demo
-            </a>
-            <a href="https://github.com/Godwin-88/psychic-invention" target="_blank" rel="noopener noreferrer" className="text-slate-300 hover:text-blue-400 px-3 py-2 text-sm font-medium transition-colors">
-              GitHub
-            </a>
+          <nav className="flex flex-wrap gap-4 text-sm text-slate-300">
+            {navLinks.map((link) => (
+              <NavLink
+                key={link.to}
+                to={link.to}
+                className={({ isActive }) =>
+                  `hover:text-primary-400 transition ${
+                    isActive ? 'text-primary-300 font-semibold' : 'text-slate-300'
+                  }`
+                }
+              >
+                {link.label}
+              </NavLink>
+            ))}
           </nav>
 
-          {/* Status & CTA */}
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center">
-              <div className={`w-2 h-2 rounded-full mr-2 ${isHealthy ? 'bg-success animate-pulse' : 'bg-danger'}`}></div>
-              <span className="text-sm text-slate-300 font-mono">
-                {isHealthy ? 'LIVE' : 'OFFLINE'}
-              </span>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 text-sm text-slate-400 font-mono">
+              <span className={`status-dot ${isHealthy ? 'bg-success animate-pulse' : 'bg-danger'}`}></span>
+              {isHealthy ? 'API LIVE' : 'API DOWN'}
             </div>
-            <Button variant="outline" size="sm">Login</Button>
-            <Button size="sm">Get Started</Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.open('https://github.com/Godwin-88/psychic-invention', '_blank')}
+            >
+              GitHub
+            </Button>
+            <Button size="sm" onClick={() => navigate('/workspace')}>
+              Launch Workspace
+            </Button>
           </div>
         </div>
       </div>

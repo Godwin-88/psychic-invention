@@ -11,7 +11,16 @@ export default {
         success: '#10b981',   
         danger: '#ef4444',    
         warning: '#f59e0b',   
-        gold: '#fbbf24',      
+        gold: '#fbbf24',
+        primary: {
+          100: '#e0f2ff',
+          200: '#bae6fd',
+          300: '#7dd3fc',
+          400: '#38bdf8',
+          500: '#0ea5e9',
+          600: '#0284c7',
+          700: '#0369a1',
+        },
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],

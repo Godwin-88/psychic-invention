@@ -1,7 +1,12 @@
 // Custom Hooks - Modular state management
 import { useState, useEffect } from 'react';
-import { checkHealth, priceCallBS } from '@/utils/api';
-import type { OptionRequest, PricingResponse } from '@/types';
+import { checkHealth, priceCallBS, pricePutBS, priceCallFFT, pricePutFFT } from '@/utils/api';
+import type {
+  OptionRequest,
+  BlackScholesResult,
+  FFTRequest,
+  FFTPricingResult,
+} from '@/types';
 
 export const useHealthCheck = () => {
   const [isHealthy, setIsHealthy] = useState<boolean>(false);
@@ -27,24 +32,29 @@ export const useHealthCheck = () => {
   return { isHealthy, loading };
 };
 
-export const usePricing = () => {
+export const useBlackScholesPricing = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<PricingResponse | null>(null);
+  const [result, setResult] = useState<BlackScholesResult | null>(null);
 
-  const calculatePrice = async (request: OptionRequest) => {
+  const calculate = async (request: OptionRequest) => {
     setLoading(true);
     setError(null);
     
     try {
       const startTime = performance.now();
-      const response = await priceCallBS(request);
+      const [call, put] = await Promise.all([
+        priceCallBS(request),
+        pricePutBS(request),
+      ]);
       const endTime = performance.now();
       
       setResult({
-        ...response,
+        callPrice: call.price,
+        putPrice: put.price,
+        model: call.model,
         responseTime: Math.round(endTime - startTime),
-      } as PricingResponse & { responseTime: number });
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Calculation failed');
     } finally {
@@ -52,7 +62,43 @@ export const usePricing = () => {
     }
   };
 
-  return { calculatePrice, loading, error, result };
+  return { calculate, loading, error, result };
+};
+
+export const useFFTPricing = () => {
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<FFTPricingResult | null>(null);
+
+  const calculate = async (request: FFTRequest) => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await Promise.all([
+        priceCallFFT(request),
+        pricePutFFT(request),
+      ]);
+
+      const [callSurface, putSurface] = response;
+      setResult({
+        model: callSurface.model,
+        callSurface: callSurface.prices,
+        putSurface: putSurface.prices,
+        params: {
+          k_min: request.k_min,
+          delta_k: request.delta_k,
+          n: request.n,
+        },
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'FFT pricing failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { calculate, loading, error, result };
 };
 
 export const usePerformanceMetrics = () => {

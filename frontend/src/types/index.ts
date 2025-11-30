@@ -12,6 +12,13 @@ export interface PricingResponse {
   model: string;
 }
 
+export interface BlackScholesResult {
+  callPrice: number;
+  putPrice: number;
+  model: string;
+  responseTime: number;
+}
+
 export interface FFTRequest extends OptionRequest {
   k_min: number;
   delta_v: number;
@@ -23,6 +30,17 @@ export interface FFTRequest extends OptionRequest {
 export interface FFTResponse {
   prices: number[];
   model: string;
+}
+
+export interface FFTPricingResult {
+  model: string;
+  callSurface: number[];
+  putSurface: number[];
+  params: {
+    k_min: number;
+    delta_k: number;
+    n: number;
+  };
 }
 
 export interface PerformanceMetrics {
@@ -41,4 +59,12 @@ export interface FeatureCard {
     accuracy: string;
     usage: string;
   };
+}
+
+export interface Greeks {
+  delta: number;
+  gamma: number;
+  theta: number;
+  vega: number;
+  rho: number;
 }
