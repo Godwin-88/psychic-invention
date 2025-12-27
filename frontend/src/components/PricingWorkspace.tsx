@@ -1,8 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/Button';
+import { ExportButton } from '@/components/ExportButton';
+import { MarketDataDashboard } from '@/components/MarketDataDashboard';
 import { useBlackScholesPricing, useFFTPricing } from '@/hooks/useApi';
 import type { OptionRequest, FFTRequest } from '@/types';
 import { computeCallGreeks } from '@/utils/greeks';
+import { 
+  exportBlackScholesCSV, 
+  exportBlackScholesJSON,
+  exportFFTSurfaceCSV,
+  exportFFTSurfaceJSON,
+  exportFFTCompleteJSON
+} from '@/utils/export';
 
 const defaultOptionRequest: OptionRequest = {
   s: 100,
@@ -26,6 +35,7 @@ const defaultFFTState = {
 type FFTState = typeof defaultFFTState;
 type PricingWorkspaceProps = {
   defaultTab?: 'bs' | 'fft';
+  showMarketData?: boolean;
 };
 
 export const PricingWorkspace = ({ defaultTab = 'bs' }: PricingWorkspaceProps) => {
@@ -105,6 +115,28 @@ export const PricingWorkspace = ({ defaultTab = 'bs' }: PricingWorkspaceProps) =
     runFFT(payload);
   };
 
+  const handleFFTSurfaceExportCSV = () => {
+    if (!fftWindow.length) return;
+    exportFFTSurfaceCSV(fftWindow);
+  };
+
+  const handleFFTSurfaceExportJSON = () => {
+    if (!fftWindow.length) return;
+    exportFFTSurfaceJSON(fftWindow);
+  };
+
+  const handleFFTCompleteExportJSON = () => {
+    if (!fftResult) return;
+    const payload: FFTRequest = {
+      ...fftState,
+      tau: fftState.tau,
+      k: fftState.k,
+      k_min: kMin,
+      delta_k: deltaK,
+    };
+    exportFFTCompleteJSON(payload, fftResult);
+  };
+
   return (
     <section className="section-padding bg-slate-950 border-b border-slate-800">
       <div className="container space-y-10">
@@ -166,6 +198,13 @@ export const PricingWorkspace = ({ defaultTab = 'bs' }: PricingWorkspaceProps) =
                 <div className="space-y-6">
                   {bsResult ? (
                     <>
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-sm font-semibold text-slate-300">Results</h3>
+                        <ExportButton
+                          onExportCSV={() => exportBlackScholesCSV(optionRequest, bsResult, greeks)}
+                          onExportJSON={() => exportBlackScholesJSON(optionRequest, bsResult, greeks)}
+                        />
+                      </div>
                       <div className="grid sm:grid-cols-2 gap-4">
                         <div className="result-tile">
                           <p className="text-xs uppercase tracking-widest text-slate-400">Call</p>
@@ -307,8 +346,27 @@ export const PricingWorkspace = ({ defaultTab = 'bs' }: PricingWorkspaceProps) =
                       </div>
                       <div className="bg-slate-950/40 border border-slate-800 rounded-xl">
                         <div className="flex items-center justify-between p-4 border-b border-slate-800">
-                          <p className="text-xs uppercase tracking-widest text-slate-500">Option chain slice</p>
-                          <span className="text-slate-400 text-xs">Centered at K={fftState.k}</span>
+                          <div>
+                            <p className="text-xs uppercase tracking-widest text-slate-500">Option chain slice</p>
+                            <span className="text-slate-400 text-xs">Centered at K={fftState.k}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <ExportButton
+                              onExportCSV={handleFFTSurfaceExportCSV}
+                              onExportJSON={handleFFTSurfaceExportJSON}
+                              disabled={!fftWindow.length}
+                              className="mr-2"
+                            />
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={handleFFTCompleteExportJSON}
+                              disabled={!fftResult}
+                              className="text-xs"
+                            >
+                              Export Full Results
+                            </Button>
+                          </div>
                         </div>
                         <div className="overflow-x-auto">
                           <table className="w-full text-sm font-mono">

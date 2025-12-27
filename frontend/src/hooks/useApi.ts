@@ -1,11 +1,17 @@
 // Custom Hooks - Modular state management
-import { useState, useEffect } from 'react';
-import { checkHealth, priceCallBS, pricePutBS, priceCallFFT, pricePutFFT } from '@/utils/api';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { checkHealth, priceCallBS, pricePutBS, priceCallFFT, pricePutFFT, checkMarketDataHealth, getMarketData, getOptionChain, getSupportedSymbols } from '@/utils/api';
 import type {
   OptionRequest,
   BlackScholesResult,
   FFTRequest,
   FFTPricingResult,
+  MarketDataRequest,
+  MarketDataResponse,
+  OptionChainRequest,
+  OptionChainResponse,
+  SupportedSymbolsResponse,
+  MarketDataComparison,
 } from '@/types';
 
 export const useHealthCheck = () => {
@@ -121,4 +127,168 @@ export const usePerformanceMetrics = () => {
   }, []);
 
   return metrics;
+};
+
+// Market Data Hooks
+export const useMarketDataHealth = () => {
+  const [isHealthy, setIsHealthy] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const checkApiHealth = async () => {
+      try {
+        const response = await checkMarketDataHealth();
+        setIsHealthy(response.api_connection);
+        setError(null);
+      } catch (err) {
+        setIsHealthy(false);
+        setError(err instanceof Error ? err.message : 'Market data service unavailable');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkApiHealth();
+    const interval = setInterval(checkApiHealth, 30000); // Check every 30s
+    return () => clearInterval(interval);
+  }, []);
+
+  return { isHealthy, loading, error };
+};
+
+export const useMarketData = (symbol?: string, autoRefresh = false, refreshInterval = 30000) => {
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [data, setData] = useState<MarketDataResponse | null>(null);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const fetchMarketData = useCallback(async (request: MarketDataRequest) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const response = await getMarketData(request);
+      setData(response);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch market data');
+      setData(null);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Auto-refresh functionality
+  useEffect(() => {
+    if (autoRefresh && symbol) {
+      const startAutoRefresh = () => {
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+        }
+        
+        intervalRef.current = setInterval(() => {
+          fetchMarketData({ symbol });
+        }, refreshInterval);
+      };
+
+      // Initial fetch
+      fetchMarketData({ symbol });
+      startAutoRefresh();
+
+      return () => {
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+        }
+      };
+    }
+  }, [symbol, autoRefresh, refreshInterval, fetchMarketData]);
+
+  const stopAutoRefresh = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  }, []);
+
+  return { 
+    fetchMarketData, 
+    loading, 
+    error, 
+    data, 
+    stopAutoRefresh,
+    isAutoRefreshing: intervalRef.current !== null 
+  };
+};
+
+export const useOptionChain = () => {
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [data, setData] = useState<OptionChainResponse | null>(null);
+
+  const fetchOptionChain = useCallback(async (request: OptionChainRequest) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const response = await getOptionChain(request);
+      setData(response);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch option chain');
+      setData(null);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  return { fetchOptionChain, loading, error, data };
+};
+
+export const useSupportedSymbols = () => {
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [data, setData] = useState<SupportedSymbolsResponse | null>(null);
+
+  useEffect(() => {
+    const fetchSymbols = async () => {
+      try {
+        const response = await getSupportedSymbols();
+        setData(response);
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch supported symbols');
+        setData(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSymbols();
+  }, []);
+
+  return { loading, error, data };
+};
+
+export const useMarketComparison = () => {
+  const calculateComparison = useCallback((
+    theoreticalPrice: number,
+    marketData: MarketDataResponse
+  ): MarketDataComparison => {
+    const midPrice = (marketData.bid + marketData.ask) / 2;
+    const spread = marketData.ask - marketData.bid;
+    const priceDifference = theoreticalPrice - midPrice;
+    const priceDifferencePercent = (priceDifference / midPrice) * 100;
+
+    return {
+      theoretical_price: theoreticalPrice,
+      market_price: midPrice,
+      bid: marketData.bid,
+      ask: marketData.ask,
+      spread,
+      mid_price: midPrice,
+      price_difference: priceDifference,
+      price_difference_percent: priceDifferencePercent,
+    };
+  }, []);
+
+  return { calculateComparison };
 };

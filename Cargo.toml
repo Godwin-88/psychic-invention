@@ -16,7 +16,21 @@ rand_distr = "0.5.1"
 rayon = { version = "1.10.0"}  # optional for parallel
 rustfft = "6.0"
 num-complex = "0.4"
+lazy_static = "1.4"
 
 [dev-dependencies]
 proptest = "1.0"
 approx = "0.5"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "pricing_benchmarks"
+harness = false
+
+[[bench]]
+name = "simple_benchmarks"
+harness = false
+
+[[bench]]
+name = "performance_benchmarks"
+harness = false
