@@ -7,11 +7,11 @@ import uuid
 import time
 
 # Import enhanced error handling and health checks
-from error_handling import (
+from app.error_handling import (
     handle_api_error, create_error_context, ValidationError, CalculationError,
     NumericalInstabilityError, configure_logging, error_handler
 )
-from health_check import get_health_report, get_basic_health, health_checker
+from app.health_check import get_health_report, get_basic_health, health_checker
 
 # Try to import the Rust pricing engine, fall back to mock if not available
 try:
@@ -24,7 +24,7 @@ except ImportError:
 
 # Import market data endpoints
 try:
-    from market_data_endpoints import router as market_data_router, cleanup_deriv_client
+    from app.market_data_endpoints import router as market_data_router, cleanup_deriv_client
     MARKET_DATA_AVAILABLE = True
 except ImportError as e:
     print(f"Warning: Market data endpoints not available: {e}")

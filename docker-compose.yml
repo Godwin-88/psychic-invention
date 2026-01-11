@@ -1,0 +1,93 @@
+version: '3.8'
+
+services:
+  # Backend API Service
+  pricing-engine-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONPATH=/app
+      - RUST_LOG=info
+      - FASTAPI_ENV=production
+      - DERIV_API_KEY=${DERIV_API_KEY:-}
+      - DERIV_APP_ID=${DERIV_APP_ID:-}
+      - CACHE_TTL_L1=30
+      - CACHE_TTL_L2=300
+      - MAX_CONCURRENT_REQUESTS=1000
+      - RATE_LIMIT_PER_SECOND=10
+    volumes:
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - pricing-engine-network
+
+  # Frontend Service
+  pricing-engine-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000
+      - NODE_ENV=production
+    depends_on:
+      pricing-engine-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - pricing-engine-network
+
+  # Redis Cache (Optional)
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - pricing-engine-network
+
+  # Nginx Reverse Proxy (Optional)
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - pricing-engine-api
+      - pricing-engine-frontend
+    restart: unless-stopped
+    networks:
+      - pricing-engine-network
+
+volumes:
+  redis-data:
+
+networks:
+  pricing-engine-network:
+    driver: bridge

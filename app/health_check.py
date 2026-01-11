@@ -7,13 +7,20 @@ including pricing models, external APIs, and system resources.
 
 import asyncio
 import time
-import psutil
 import sys
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional, Callable
 from dataclasses import dataclass, asdict
 from enum import Enum
 import structlog
+
+# Optional psutil import for system monitoring
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    PSUTIL_AVAILABLE = False
+    print("Warning: psutil not available, system monitoring disabled")
 
 # Import pricing engine components for testing
 try:
@@ -23,7 +30,7 @@ except ImportError:
     pricing_engine = None
     PRICING_ENGINE_AVAILABLE = False
 
-from error_handling import ErrorHandler, ErrorCategory, ErrorSeverity, PricingEngineError
+from app.error_handling import ErrorHandler, ErrorCategory, ErrorSeverity, PricingEngineError
 
 logger = structlog.get_logger(__name__)
 

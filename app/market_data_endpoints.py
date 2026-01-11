@@ -12,7 +12,7 @@ from datetime import datetime, date
 import asyncio
 import logging
 
-from deriv_api_client import (
+from app.deriv_api_client import (
     DerivAPIClient, MarketData, OptionChain, OptionContract,
     AssetClass, MarketDataUnavailable, ValidationError, RateLimitExceeded
 )

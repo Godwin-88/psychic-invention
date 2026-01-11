@@ -1,0 +1,62 @@
+# Python 3.11 Compatible Requirements for Pricing Engine
+# Tested and verified versions for Python 3.11
+
+# Core API Framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+
+# Rust-Python Bindings
+maturin>=1.0.0,<1.5.0
+
+# Numerical Computing (Python 3.11 compatible)
+numpy>=1.21.0,<1.26.0
+scipy>=1.9.0,<1.12.0
+
+# HTTP and API
+httpx==0.25.2
+requests==2.31.0
+aiofiles==23.2.1
+
+# Testing Framework
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+pytest-mock==3.12.0
+
+# Performance and Monitoring
+psutil==5.9.6
+
+# Production Server
+gunicorn==21.2.0
+
+# Development Tools
+black==23.11.0
+isort==5.12.0
+
+# Security
+cryptography>=41.0.0
+
+# Configuration Management
+python-dotenv==1.0.0
+
+# Logging and Monitoring
+structlog==23.2.0
+
+# Caching
+cachetools==5.3.2
+
+# Property-based testing
+hypothesis>=6.80.0
+
+# Utilities
+click==8.1.7
+python-dateutil==2.8.2
+
+# Optional: Data Science (if needed)
+pandas>=1.5.0,<2.1.0
+matplotlib>=3.6.0,<3.8.0
+
+# Optional: Jupyter (if needed)
+jupyter>=1.0.0
+ipykernel>=6.20.0
