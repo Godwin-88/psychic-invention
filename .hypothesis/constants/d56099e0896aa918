@@ -1,0 +1,4 @@
+# file: C:\Users\ThinkPad\Documents\Goddy's Project\psychic-invention\app\market_data_endpoints.py
+# hypothesis_version: 6.148.8
+
+[10.0, 300, 400, 404, 422, 429, 500, 503, '%Y-%m-%d', '/cache/clear', '/cache/stats', '/health', '/market-data', '/option-chain', '/spot', '/symbols', 'AAPL', 'AMZN', 'AUDUSD', 'DIA', 'EURUSD', 'GBPUSD', 'GLD', 'GOOGL', 'IWM', 'META', 'MSFT', 'NVDA', 'QQQ', 'SLV', 'SPY', 'TSLA', 'UNG', 'USDCAD', 'USDJPY', 'USO', 'VIX', 'api_connection', 'asset_classes', 'commodities', 'currencies', 'degraded', 'healthy', 'indices', 'l1_cache_info', 'l1_cache_size', 'l2_cache_info', 'l2_cache_size', 'market-data', 'message', 'note', 'production_api_key', 'production_app_id', 'service', 'status', 'stocks', 'success', 'symbols', 'timestamp']

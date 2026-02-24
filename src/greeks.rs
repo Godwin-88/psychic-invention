@@ -1,6 +1,8 @@
 use pyo3::prelude::*;
-use statrs::distribution::{Normal, ContinuousCDF};
-use std::f64::consts::PI;
+use rayon::prelude::*;
+
+// Pre-computed constants for optimization
+const INV_SQRT_2PI: f64 = 0.3989422804014326779;
 
 /// Greeks calculation result structure
 #[derive(Debug, Clone, Copy)]
@@ -33,10 +35,38 @@ impl Greeks {
     }
 }
 
-/// Trait for pricing models that support Greeks calculation
-pub trait PricingModel {
-    fn price_call(&self, s: f64, k: f64, tau: f64, r: f64, sigma: f64) -> Result<f64, Box<dyn std::error::Error>>;
-    fn price_put(&self, s: f64, k: f64, tau: f64, r: f64, sigma: f64) -> Result<f64, Box<dyn std::error::Error>>;
+/// Fast normal PDF approximation for hot path performance
+#[inline]
+fn fast_normal_pdf(x: f64) -> f64 {
+    if x.abs() > 8.0 {
+        return 0.0;
+    }
+    INV_SQRT_2PI * (-0.5 * x * x).exp()
+}
+
+/// Fast normal CDF approximation for hot path performance
+#[inline]
+fn fast_normal_cdf(x: f64) -> f64 {
+    if x < -8.0 {
+        return 0.0;
+    }
+    if x > 8.0 {
+        return 1.0;
+    }
+    
+    let sign = if x >= 0.0 { 1.0 } else { -1.0 };
+    let x_abs = x.abs();
+    
+    // Abramowitz and Stegun approximation
+    let t = 1.0 / (1.0 + 0.2316419 * x_abs);
+    let poly = t * (0.319381530 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
+    let pdf = INV_SQRT_2PI * (-0.5 * x_abs * x_abs).exp();
+    
+    if sign > 0.0 {
+        1.0 - pdf * poly
+    } else {
+        pdf * poly
+    }
 }
 
 /// Greeks calculator with both analytical and numerical methods
@@ -48,21 +78,21 @@ impl GreeksCalculator {
         s: f64, k: f64, tau: f64, r: f64, sigma: f64,
         price_fn: impl Fn(f64, f64, f64, f64, f64) -> Result<f64, PyErr>
     ) -> PyResult<Greeks> {
-        // Finite difference parameters
-        let ds = s * 0.01;  // 1% bump for spot
-        let dt = tau * 0.01; // 1% bump for time
-        let dsigma = sigma * 0.01; // 1% bump for volatility
-        let dr = 0.0001; // 1 basis point bump for rate
+        // Optimized finite difference parameters
+        let ds = s * 0.005;  // 0.5% bump for spot (smaller for better accuracy)
+        let dt = tau * 0.005; // 0.5% bump for time
+        let dsigma = sigma * 0.005; // 0.5% bump for volatility
+        let dr = 0.00005; // 0.5 basis point bump for rate
         
         // Base price
         let price_base = price_fn(s, k, tau, r, sigma)?;
         
-        // Delta: ∂V/∂S
+        // Delta: ∂V/∂S (central difference)
         let price_up = price_fn(s + ds, k, tau, r, sigma)?;
         let price_down = price_fn(s - ds, k, tau, r, sigma)?;
         let delta = (price_up - price_down) / (2.0 * ds);
         
-        // Gamma: ∂²V/∂S²
+        // Gamma: ∂²V/∂S² (second derivative)
         let gamma = (price_up - 2.0 * price_base + price_down) / (ds * ds);
         
         // Theta: -∂V/∂t (negative because tau is time to expiration)
@@ -80,18 +110,26 @@ impl GreeksCalculator {
         Ok(Greeks::new(delta, gamma, theta, vega, rho))
     }
     
-    /// Calculate Black-Scholes Greeks analytically for improved accuracy
+    /// Calculate Black-Scholes Greeks analytically for improved accuracy and speed
+    #[inline]
     pub fn calculate_bs_analytical_greeks(
         s: f64, k: f64, tau: f64, r: f64, sigma: f64, is_call: bool
     ) -> PyResult<Greeks> {
+        // Pre-compute common terms for efficiency
         let sqrt_tau = tau.sqrt();
-        let d1 = ((s / k).ln() + (r + 0.5 * sigma * sigma) * tau) / (sigma * sqrt_tau);
-        let d2 = d1 - sigma * sqrt_tau;
+        let sigma_sqrt_tau = sigma * sqrt_tau;
+        let log_s_k = (s / k).ln();
+        let r_plus_half_sigma_sq_tau = (r + 0.5 * sigma * sigma) * tau;
         
-        let norm = Normal::new(0.0, 1.0).unwrap();
-        let n_d1 = norm.cdf(d1);
-        let n_d2 = norm.cdf(d2);
-        let phi_d1 = (-0.5 * d1 * d1).exp() / (2.0 * PI).sqrt();
+        let d1 = (log_s_k + r_plus_half_sigma_sq_tau) / sigma_sqrt_tau;
+        let d2 = d1 - sigma_sqrt_tau;
+        
+        // Use fast approximations for hot path performance
+        let n_d1 = fast_normal_cdf(d1);
+        let n_d2 = fast_normal_cdf(d2);
+        let phi_d1 = fast_normal_pdf(d1);
+        
+        let discount = (-r * tau).exp();
         
         // Delta
         let delta = if is_call {
@@ -101,26 +139,123 @@ impl GreeksCalculator {
         };
         
         // Gamma (same for calls and puts)
-        let gamma = phi_d1 / (s * sigma * sqrt_tau);
+        let gamma = phi_d1 / (s * sigma_sqrt_tau);
         
-        // Theta
-        let theta = if is_call {
-            -(s * phi_d1 * sigma) / (2.0 * sqrt_tau) - r * k * (-r * tau).exp() * n_d2
+        // Theta (daily)
+        let theta_annual = if is_call {
+            -(s * phi_d1 * sigma) / (2.0 * sqrt_tau) - r * k * discount * n_d2
         } else {
-            -(s * phi_d1 * sigma) / (2.0 * sqrt_tau) + r * k * (-r * tau).exp() * (1.0 - n_d2)
+            -(s * phi_d1 * sigma) / (2.0 * sqrt_tau) + r * k * discount * (1.0 - n_d2)
         };
+        let theta = theta_annual / 365.0; // Convert to daily theta
         
-        // Vega (same for calls and puts)
-        let vega = s * phi_d1 * sqrt_tau;
+        // Vega (same for calls and puts, convert to percentage)
+        let vega = (s * phi_d1 * sqrt_tau) / 100.0;
         
-        // Rho
+        // Rho (convert to percentage)
         let rho = if is_call {
-            k * tau * (-r * tau).exp() * n_d2
+            (k * tau * discount * n_d2) / 100.0
         } else {
-            -k * tau * (-r * tau).exp() * (1.0 - n_d2)
+            -(k * tau * discount * (1.0 - n_d2)) / 100.0
         };
         
         Ok(Greeks::new(delta, gamma, theta, vega, rho))
+    }
+    
+    /// Batch Greeks calculation with parallel processing
+    pub fn calculate_bs_greeks_batch(
+        s: f64,
+        strikes: &[f64],
+        tau: f64,
+        r: f64,
+        sigma: f64,
+        is_call: bool
+    ) -> Vec<Greeks> {
+        // Pre-compute common terms once for all strikes
+        let sqrt_tau = tau.sqrt();
+        let sigma_sqrt_tau = sigma * sqrt_tau;
+        let r_plus_half_sigma_sq_tau = (r + 0.5 * sigma * sigma) * tau;
+        let discount = (-r * tau).exp();
+        let log_s = s.ln();
+        
+        // Use parallel processing for large batches
+        if strikes.len() > 50 {
+            strikes.par_iter()
+                .map(|&k| {
+                    if k <= 0.0 {
+                        Greeks::new(0.0, 0.0, 0.0, 0.0, 0.0)
+                    } else {
+                        Self::calculate_single_bs_greeks_optimized(
+                            s, k, log_s, sqrt_tau, sigma_sqrt_tau, 
+                            r_plus_half_sigma_sq_tau, discount, is_call
+                        )
+                    }
+                })
+                .collect()
+        } else {
+            // Sequential processing for small batches
+            strikes.iter()
+                .map(|&k| {
+                    if k <= 0.0 {
+                        Greeks::new(0.0, 0.0, 0.0, 0.0, 0.0)
+                    } else {
+                        Self::calculate_single_bs_greeks_optimized(
+                            s, k, log_s, sqrt_tau, sigma_sqrt_tau, 
+                            r_plus_half_sigma_sq_tau, discount, is_call
+                        )
+                    }
+                })
+                .collect()
+        }
+    }
+    
+    /// Optimized single Greeks calculation with pre-computed terms
+    #[inline]
+    fn calculate_single_bs_greeks_optimized(
+        s: f64,
+        k: f64,
+        log_s: f64,
+        sqrt_tau: f64,
+        sigma_sqrt_tau: f64,
+        r_plus_half_sigma_sq_tau: f64,
+        discount: f64,
+        is_call: bool
+    ) -> Greeks {
+        let log_k = k.ln();
+        let d1 = (log_s - log_k + r_plus_half_sigma_sq_tau) / sigma_sqrt_tau;
+        let d2 = d1 - sigma_sqrt_tau;
+        
+        let n_d1 = fast_normal_cdf(d1);
+        let n_d2 = fast_normal_cdf(d2);
+        let phi_d1 = fast_normal_pdf(d1);
+        
+        // Delta
+        let delta = if is_call { n_d1 } else { n_d1 - 1.0 };
+        
+        // Gamma
+        let gamma = phi_d1 / (s * sigma_sqrt_tau);
+        
+        // Theta (daily)
+        let theta_annual = if is_call {
+            -(s * phi_d1 * sigma_sqrt_tau.powi(2) / sigma_sqrt_tau) / (2.0 * sqrt_tau) 
+            - r_plus_half_sigma_sq_tau / sqrt_tau.powi(2) * k * discount * n_d2
+        } else {
+            -(s * phi_d1 * sigma_sqrt_tau.powi(2) / sigma_sqrt_tau) / (2.0 * sqrt_tau) 
+            + r_plus_half_sigma_sq_tau / sqrt_tau.powi(2) * k * discount * (1.0 - n_d2)
+        };
+        let theta = theta_annual / 365.0;
+        
+        // Vega (percentage)
+        let vega = (s * phi_d1 * sqrt_tau) / 100.0;
+        
+        // Rho (percentage)
+        let rho = if is_call {
+            (k * sqrt_tau.powi(2) * discount * n_d2) / 100.0
+        } else {
+            -(k * sqrt_tau.powi(2) * discount * (1.0 - n_d2)) / 100.0
+        };
+        
+        Greeks::new(delta, gamma, theta, vega, rho)
     }
 }
 
@@ -137,6 +272,30 @@ pub fn calculate_bs_put_greeks(
     s: f64, k: f64, tau: f64, r: f64, sigma: f64
 ) -> PyResult<Greeks> {
     GreeksCalculator::calculate_bs_analytical_greeks(s, k, tau, r, sigma, false)
+}
+
+/// Batch Greeks calculation for calls
+#[pyfunction]
+pub fn calculate_bs_call_greeks_batch(
+    s: f64,
+    strikes: Vec<f64>,
+    tau: f64,
+    r: f64,
+    sigma: f64
+) -> PyResult<Vec<Greeks>> {
+    Ok(GreeksCalculator::calculate_bs_greeks_batch(s, &strikes, tau, r, sigma, true))
+}
+
+/// Batch Greeks calculation for puts
+#[pyfunction]
+pub fn calculate_bs_put_greeks_batch(
+    s: f64,
+    strikes: Vec<f64>,
+    tau: f64,
+    r: f64,
+    sigma: f64
+) -> PyResult<Vec<Greeks>> {
+    Ok(GreeksCalculator::calculate_bs_greeks_batch(s, &strikes, tau, r, sigma, false))
 }
 
 #[pyfunction]
@@ -179,7 +338,7 @@ pub fn calculate_heston_call_greeks(
 ) -> PyResult<Greeks> {
     use crate::heston::price_heston_call;
     let price_fn = |s: f64, k: f64, tau: f64, r: f64, _sigma: f64| -> Result<f64, PyErr> {
-        price_heston_call(s, k, tau, r, v0, theta, kappa, sigma_v, rho)
+        price_heston_call(s, k, v0, r, kappa, theta, sigma_v, rho, tau)
     };
     GreeksCalculator::calculate_numerical_greeks(s, k, tau, r, v0.sqrt(), price_fn)
 }
@@ -190,7 +349,7 @@ pub fn calculate_heston_put_greeks(
 ) -> PyResult<Greeks> {
     use crate::heston::price_heston_put;
     let price_fn = |s: f64, k: f64, tau: f64, r: f64, _sigma: f64| -> Result<f64, PyErr> {
-        price_heston_put(s, k, tau, r, v0, theta, kappa, sigma_v, rho)
+        price_heston_put(s, k, v0, r, kappa, theta, sigma_v, rho, tau)
     };
     GreeksCalculator::calculate_numerical_greeks(s, k, tau, r, v0.sqrt(), price_fn)
 }

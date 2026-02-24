@@ -1,1 +1,7 @@
 /target
+.vercel
+
+# Virtual Environment
+venv/
+env/
+ENV/
