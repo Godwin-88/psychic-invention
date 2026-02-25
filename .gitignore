@@ -5,3 +5,14 @@
 venv/
 env/
 ENV/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Node
+node_modules/
+
+# Build / Cache
+frontend/node_modules/.vite/

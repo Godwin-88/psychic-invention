@@ -5,6 +5,7 @@ import { useHealthCheck } from '@/hooks/useApi';
 const navLinks = [
   { label: 'Marketplace', to: '/marketplace' },
   { label: 'Workspace', to: '/workspace' },
+  { label: 'Transact', to: '/transact' },
   { label: 'FFT Surface', to: '/fft' },
   { label: 'Ops Centre', to: '/operations' },
   { label: 'API', to: '/api-playground' },

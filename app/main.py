@@ -7,11 +7,11 @@ import uuid
 import time
 
 # Import enhanced error handling and health checks
-from error_handling import (
+from .error_handling import (
     handle_api_error, create_error_context, ValidationError, CalculationError,
     NumericalInstabilityError, configure_logging, error_handler
 )
-from health_check import get_health_report, get_basic_health, health_checker
+from .health_check import get_health_report, get_basic_health, health_checker
 
 # Try to import the Rust pricing engine, fall back to mock if not available
 try:
@@ -24,11 +24,19 @@ except ImportError:
 
 # Import market data endpoints
 try:
-    from market_data_endpoints import router as market_data_router, cleanup_deriv_client
+    from .market_data_endpoints import router as market_data_router, cleanup_deriv_client
     MARKET_DATA_AVAILABLE = True
 except ImportError as e:
     print(f"Warning: Market data endpoints not available: {e}")
     MARKET_DATA_AVAILABLE = False
+
+# Import Transact Phase 1 routes (Portfolio, Risk, Optimizer, Blotter)
+try:
+    from .transact_routes import router as transact_router
+    TRANSACT_AVAILABLE = True
+except ImportError as e:
+    print(f"Warning: Transact routes not available: {e}")
+    TRANSACT_AVAILABLE = False
 
 # Configure enhanced logging
 configure_logging(log_level="INFO", log_format="json")
@@ -64,6 +72,10 @@ app.add_middleware(
 # Include market data router if available
 if MARKET_DATA_AVAILABLE:
     app.include_router(market_data_router)
+
+# Include Transact Phase 1 router
+if TRANSACT_AVAILABLE:
+    app.include_router(transact_router)
     
     # Add cleanup handler
     @app.on_event("shutdown")
