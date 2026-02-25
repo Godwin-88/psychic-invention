@@ -5,6 +5,7 @@ import { MarketplaceStage } from './components/MarketplaceStage';
 import { PricingWorkspace } from './components/PricingWorkspace';
 import { ProcessingStage } from './components/ProcessingStage';
 import { ApiPlayground } from './components/ApiPlayground';
+import { TransactPage } from './components/Transact/TransactPage';
 
 const MarketplacePage = () => (
   <>
@@ -24,6 +25,7 @@ function App() {
           <Route path="/workspace" element={<PricingWorkspace />} />
           <Route path="/fft" element={<PricingWorkspace defaultTab="fft" />} />
           <Route path="/operations" element={<ProcessingStage />} />
+          <Route path="/transact" element={<TransactPage />} />
           <Route path="/api-playground" element={<ApiPlayground />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

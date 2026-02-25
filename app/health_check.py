@@ -23,7 +23,7 @@ except ImportError:
     pricing_engine = None
     PRICING_ENGINE_AVAILABLE = False
 
-from error_handling import ErrorHandler, ErrorCategory, ErrorSeverity, PricingEngineError
+from .error_handling import ErrorHandler, ErrorCategory, ErrorSeverity, PricingEngineError
 
 logger = structlog.get_logger(__name__)
 

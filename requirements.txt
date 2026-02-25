@@ -1,8 +1,12 @@
+# Bootstrap (install first to avoid setuptools build errors)
+setuptools>=65.0.0
+wheel>=0.40.0
+
 # Core Dependencies
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 pydantic==2.5.0
-numpy==1.24.4
+numpy>=1.24.0,<2.0.0
 maturin==1.4.0
 
 # HTTP and API
@@ -11,8 +15,8 @@ requests==2.31.0
 aiofiles==23.2.1
 
 # Data Science and Numerical Computing
-scipy==1.10.1
-pandas==2.0.3
+scipy>=1.10.0
+pandas>=2.0.0
 matplotlib==3.7.2
 seaborn==0.12.2
 plotly==5.17.0
@@ -30,12 +34,12 @@ pytest-benchmark==4.0.0
 # Performance and Monitoring
 psutil==5.9.6
 memory-profiler==0.61.0
-line-profiler==4.1.1
+# line-profiler==4.1.1  # Fails on Python 3.12+ (Cython 3.0.0a11 unavailable)
 py-spy==0.3.14
 
-# Production Server
-gunicorn==21.2.0
-gevent==23.9.1
+# Production Server (optional; gevent fails on Python 3.13)
+# gunicorn==21.2.0
+# gevent==23.9.1
 
 # Development Tools
 black==23.11.0
@@ -72,6 +76,9 @@ sentry-sdk[fastapi]==1.38.0
 
 # Load Testing
 locust==2.17.0
+
+# Optimization (Phase 1: MVO)
+cvxpy>=1.4.0
 
 # Financial Libraries
 quantlib==1.32
@@ -112,8 +119,6 @@ pytz==2023.3
 # Development Dependencies
 ipython==8.13.0
 jupyterlab==4.0.8
-wheel==0.42.0
-setuptools==69.0.2
 pip-tools==7.3.0
 
 # Optional: GPU Computing (uncomment if needed)
