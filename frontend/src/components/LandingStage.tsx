@@ -1,11 +1,20 @@
 import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/Button';
 import { useHealthCheck, usePerformanceMetrics } from '@/hooks/useApi';
 
-const highlights = [
-  { label: 'Models Online', value: 'Black-Scholes · FFT' },
-  { label: 'Rust Core', value: 'PyO3 bindings, maturin build' },
-  { label: 'API Surface', value: '4 pricing endpoints' },
+const capabilities = [
+  { icon: '⚡', label: 'Derivatives Pricer', desc: 'BS · FFT · Heston', route: '/transact/pricer' },
+  { icon: '📊', label: 'Portfolio Analytics', desc: 'MVO · Black-Litterman', route: '/transact/portfolio' },
+  { icon: '🛡️', label: 'Risk Management', desc: 'VaR · CVaR · Greeks', route: '/transact/risk' },
+  { icon: '🔬', label: 'Volatility Lab', desc: 'IV Surface · Heston Cal.', route: '/transact/volatility' },
+  { icon: '🧬', label: 'Factor Lab', desc: 'Fama-MacBeth · Smart Beta', route: '/transact/factor' },
+  { icon: '🎯', label: 'Scenario Engine', desc: 'Stress · Monte Carlo', route: '/transact/scenarios' },
+];
+
+const endpoints = [
+  { method: 'POST', path: '/price/call/bs', badge: 'Analytical' },
+  { method: 'POST', path: '/price/call/fft', badge: 'FFT Surface' },
+  { method: 'GET',  path: '/market/snapshot', badge: 'Real-time' },
+  { method: 'POST', path: '/portfolio/optimize', badge: 'MVO / BLM' },
 ];
 
 export const LandingStage = () => {
@@ -14,94 +23,122 @@ export const LandingStage = () => {
   const navigate = useNavigate();
 
   return (
-    <section className="section-padding bg-gradient-to-b from-slate-950 via-slate-900 to-slate-900 border-b border-slate-800">
-      <div className="container grid gap-12 lg:grid-cols-2">
-        <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-slate-400 mb-3 font-semibold">Platform overview</p>
-          <h1 className="text-4xl md:text-5xl font-extrabold text-white mb-6 leading-tight">
-            Wall Street grade pricing, packaged for real teams.
-          </h1>
-          <p className="text-lg text-slate-300 mb-8">
-            Surface the Rust pricing engine through a product-ready interface. Benchmark models,
-            impress stakeholders, and route trades faster than legacy desks.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 mb-10">
-            <Button size="lg" className="flex-1 sm:flex-none" onClick={() => navigate('/workspace')}>
-              Launch Pricing Workspace
-            </Button>
-            <Button variant="outline" size="lg" className="flex-1 sm:flex-none" onClick={() => navigate('/marketplace')}>
-              Browse Marketplace
-            </Button>
+    <section className="relative min-h-[90vh] flex items-center overflow-hidden bg-slate-950">
+      {/* Ambient glow */}
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950" />
+      <div className="absolute top-[-10%] left-[20%] w-[500px] h-[500px] bg-blue-600/8 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[10%] w-[400px] h-[400px] bg-indigo-700/8 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-[30%] right-[30%] w-[300px] h-[300px] bg-violet-600/5 rounded-full blur-3xl pointer-events-none" />
+
+      <div className="relative container py-24 grid gap-16 lg:grid-cols-2 items-center">
+        {/* ── Left column ── */}
+        <div className="space-y-8">
+          <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full bg-blue-500/10 border border-blue-500/20 w-fit">
+            <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+            <span className="text-xs font-semibold text-blue-300 uppercase tracking-widest">
+              Institutional-Grade Quant Platform
+            </span>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="stat-card">
-              <span className="text-slate-400 text-xs uppercase tracking-widest">API Health</span>
-              <div className="flex items-center mt-2 space-x-2">
-                <span className={`status-dot ${isHealthy ? 'bg-success' : 'bg-danger'}`}></span>
-                <p className="text-lg font-semibold">{isHealthy ? 'Live' : 'Offline'}</p>
-              </div>
-              <p className="text-xs text-slate-500 mt-2">FastAPI + PyO3 bindings</p>
-            </div>
-            <div className="stat-card">
-              <span className="text-slate-400 text-xs uppercase tracking-widest">Calculations Served</span>
-              <p className="text-3xl font-mono text-primary-300 mt-2">{metrics.calculationsServed.toLocaleString()}+</p>
-              <p className="text-xs text-slate-500 mt-2">Synthetic live feed</p>
-            </div>
-            <div className="stat-card">
-              <span className="text-slate-400 text-xs uppercase tracking-widest">SLA / Avg latency</span>
-              <p className="text-3xl font-mono text-success mt-2">99.9% / {metrics.avgResponseTime}ms</p>
-              <p className="text-xs text-slate-500 mt-2">Black-Scholes endpoint</p>
-            </div>
+
+          <div className="space-y-4">
+            <h1 className="text-5xl md:text-6xl font-black text-white leading-[1.08] tracking-tight">
+              Quantitative
+              <span className="block text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-blue-300 to-indigo-400">
+                Trading Suite
+              </span>
+            </h1>
+            <p className="text-xl text-slate-400 leading-relaxed max-w-lg">
+              Full-stack derivatives platform — Rust pricing engine, portfolio analytics,
+              risk management, optimizer, volatility lab, and AI-powered factor models.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-4">
+            <button
+              onClick={() => navigate('/transact')}
+              className="px-8 py-4 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl transition-all duration-200 shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30 hover:-translate-y-0.5 active:translate-y-0"
+            >
+              Launch Platform →
+            </button>
+            <button
+              onClick={() => navigate('/marketplace')}
+              className="px-8 py-4 bg-slate-800/80 hover:bg-slate-700 text-slate-200 font-semibold rounded-xl border border-slate-700 hover:border-slate-600 transition-all duration-200"
+            >
+              Browse Modules
+            </button>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {['Rust Core', 'PyO3 Bindings', 'FastAPI', 'React 18', 'Tailwind CSS', 'BS · FFT · Heston'].map(tech => (
+              <span
+                key={tech}
+                className="px-3 py-1.5 text-xs font-medium text-slate-400 bg-slate-800/60 border border-slate-700/60 rounded-full"
+              >
+                {tech}
+              </span>
+            ))}
           </div>
         </div>
 
-        <div className="card bg-dark-200 shadow-2xl border-primary-700/20">
-          <p className="text-xs uppercase tracking-[0.3em] text-primary-300 mb-4 font-semibold">API snapshot</p>
-          <div className="space-y-4 text-sm font-mono">
-            <div className="bg-slate-900/60 rounded-lg p-4 border border-slate-700">
-              <p className="text-xs text-slate-500 mb-1 uppercase tracking-widest">REST endpoints</p>
-              <ul className="space-y-2">
-                <li className="flex items-center justify-between text-slate-200">
-                  <span>POST /price/call/bs</span>
-                  <span className="text-primary-400">Analytical</span>
-                </li>
-                <li className="flex items-center justify-between text-slate-200">
-                  <span>POST /price/put/bs</span>
-                  <span className="text-primary-400">Parity</span>
-                </li>
-                <li className="flex items-center justify-between text-slate-200">
-                  <span>POST /price/call/fft</span>
-                  <span className="text-gold text-sm">Surface</span>
-                </li>
-                <li className="flex items-center justify-between text-slate-200">
-                  <span>POST /price/put/fft</span>
-                  <span className="text-gold text-sm">Surface</span>
-                </li>
-              </ul>
-            </div>
-            <div className="bg-slate-900/60 rounded-lg p-4 border border-slate-700">
-              <p className="text-xs text-slate-500 mb-1 uppercase tracking-widest">Highlights</p>
-              <ul className="space-y-2 text-slate-200">
-                {highlights.map((item) => (
-                  <li key={item.label} className="flex items-center justify-between">
-                    <span className="text-slate-400">{item.label}</span>
-                    <span>{item.value}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div className="bg-slate-900/60 rounded-lg p-4 border border-slate-700">
-              <p className="text-xs text-slate-500 mb-3 uppercase tracking-widest">User journey</p>
-              <div className="flex items-center justify-between text-xs text-slate-300">
-                <span>Overview</span>
-                <span>Marketplace</span>
-                <span>Workspace</span>
-                <span>Operations</span>
+        {/* ── Right column ── */}
+        <div className="space-y-4">
+          {/* Status card */}
+          <div className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 backdrop-blur-sm">
+            <div className="flex items-center justify-between mb-5">
+              <span className="text-xs uppercase tracking-widest text-slate-500 font-semibold">System Status</span>
+              <div className="flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full ${isHealthy ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'}`} />
+                <span className={`text-sm font-semibold ${isHealthy ? 'text-emerald-400' : 'text-red-400'}`}>
+                  {isHealthy ? 'All Systems Operational' : 'Service Degraded'}
+                </span>
               </div>
-              <div className="relative mt-2 h-1 bg-slate-700 rounded-full">
-                <div className="absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-primary-500 to-primary-400 rounded-full"></div>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="text-center p-4 rounded-xl bg-slate-800/60">
+                <p className="text-2xl font-black font-mono text-blue-300">
+                  {metrics.calculationsServed.toLocaleString()}+
+                </p>
+                <p className="text-xs text-slate-500 mt-1">Calculations</p>
               </div>
-              <p className="text-xs text-slate-500 mt-3">Navigate with the header or marketplace cards to dive deeper.</p>
+              <div className="text-center p-4 rounded-xl bg-slate-800/60">
+                <p className="text-2xl font-black font-mono text-emerald-300">{metrics.avgResponseTime}ms</p>
+                <p className="text-xs text-slate-500 mt-1">Avg Latency</p>
+              </div>
+              <div className="text-center p-4 rounded-xl bg-slate-800/60">
+                <p className="text-2xl font-black font-mono text-indigo-300">99.9%</p>
+                <p className="text-xs text-slate-500 mt-1">Uptime SLA</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Capabilities grid */}
+          <div className="grid grid-cols-2 gap-3">
+            {capabilities.map(item => (
+              <button
+                key={item.label}
+                onClick={() => navigate(item.route)}
+                className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 hover:border-slate-600 hover:bg-slate-800/60 transition-all duration-200 text-left group"
+              >
+                <div className="text-2xl mb-2">{item.icon}</div>
+                <p className="text-sm font-semibold text-white group-hover:text-blue-300 transition-colors">{item.label}</p>
+                <p className="text-xs text-slate-500 mt-0.5">{item.desc}</p>
+              </button>
+            ))}
+          </div>
+
+          {/* API strip */}
+          <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 font-mono text-xs">
+            <p className="text-slate-500 uppercase tracking-widest mb-3">Live API Endpoints</p>
+            <div className="space-y-1.5">
+              {endpoints.map(ep => (
+                <div key={ep.path} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-blue-400 text-[10px] font-bold w-8">{ep.method}</span>
+                    <span className="text-slate-300">{ep.path}</span>
+                  </div>
+                  <span className="text-[10px] text-slate-500 uppercase tracking-widest">{ep.badge}</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
