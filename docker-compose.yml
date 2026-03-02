@@ -1,0 +1,75 @@
+# =============================================================================
+# docker-compose.yml — Derivatives Pricing Engine local infrastructure
+#
+# Services
+# ────────
+#   redis   Redis 7.2 (cache for live market data: yfinance + OpenBB)
+#
+# Usage
+# ─────
+#   docker compose up -d redis        # start Redis only
+#   docker compose down               # stop and remove containers
+#   docker compose logs -f redis      # tail Redis logs
+#   docker compose exec redis redis-cli INFO memory
+#
+# The FastAPI backend and React frontend are started separately via
+# start-local.sh (or Makefile), NOT via docker-compose, so that
+# hot-reload and maturin dev builds work naturally.
+# =============================================================================
+
+services:
+
+  # ── Redis — shared market data cache ───────────────────────────────────────
+  redis:
+    image: redis:7.2-alpine
+    container_name: pricing-engine-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    command: >
+      redis-server
+        --maxmemory ${REDIS_MAXMEMORY:-256mb}
+        --maxmemory-policy allkeys-lru
+        --save ""
+        --appendonly no
+        --loglevel notice
+        --tcp-keepalive 60
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    volumes:
+      - redis-data:/data
+    networks:
+      - pricing-net
+
+  # ── Redis Commander — browser-based Redis GUI (optional, dev only) ──────────
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: pricing-engine-redis-ui
+    restart: unless-stopped
+    profiles:
+      - debug            # only starts with: docker compose --profile debug up
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - pricing-net
+
+# ── Named volumes ─────────────────────────────────────────────────────────────
+volumes:
+  redis-data:
+    driver: local
+
+# ── Networks ──────────────────────────────────────────────────────────────────
+networks:
+  pricing-net:
+    driver: bridge
