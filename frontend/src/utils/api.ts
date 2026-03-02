@@ -49,6 +49,23 @@ export const pricePutFFT = async (request: FFTRequest): Promise<FFTResponse> => 
   return response.data;
 };
 
+// Greeks (BS, FFT, numerical)
+export const postGreeksCall = async (data: { s: number; k: number; tau: number; r: number; sigma: number; model?: string }) => {
+  const response = await apiClient.post(API_CONFIG.ENDPOINTS.GREEKS_CALL, {
+    ...data,
+    model: data.model || 'bs',
+  });
+  return response.data;
+};
+
+export const postGreeksPut = async (data: { s: number; k: number; tau: number; r: number; sigma: number; model?: string }) => {
+  const response = await apiClient.post(API_CONFIG.ENDPOINTS.GREEKS_PUT, {
+    ...data,
+    model: data.model || 'bs',
+  });
+  return response.data;
+};
+
 // Market Data API functions
 export const checkMarketDataHealth = async (): Promise<{ status: string; service: string; api_connection: boolean; timestamp: string }> => {
   const response = await apiClient.get(API_CONFIG.ENDPOINTS.MARKET_DATA_HEALTH);
@@ -67,6 +84,33 @@ export const getOptionChain = async (request: OptionChainRequest): Promise<Optio
 
 export const getSupportedSymbols = async (): Promise<SupportedSymbolsResponse> => {
   const response = await apiClient.get(API_CONFIG.ENDPOINTS.MARKET_DATA_SYMBOLS);
+  return response.data;
+};
+
+// Asset Universe (yfinance)
+export const getAssetTypes = async (): Promise<{ id: string; label: string }[]> => {
+  const response = await apiClient.get(API_CONFIG.ENDPOINTS.ASSETS_TYPES);
+  return response.data;
+};
+
+export const searchAssets = async (
+  query: string,
+  type: string = 'all',
+  count: number = 50
+): Promise<{ symbol: string; type: string; name: string }[]> => {
+  const response = await apiClient.get(API_CONFIG.ENDPOINTS.ASSETS_SEARCH, {
+    params: { q: query.trim(), type, count },
+  });
+  return response.data;
+};
+
+export const getAssetHistory = async (
+  symbol: string,
+  period: string = '1mo'
+): Promise<{ date: string; open: number | null; high: number | null; low: number | null; close: number | null; volume: number | null }[]> => {
+  const response = await apiClient.get(API_CONFIG.ENDPOINTS.ASSETS_HISTORY, {
+    params: { symbol, period },
+  });
   return response.data;
 };
 

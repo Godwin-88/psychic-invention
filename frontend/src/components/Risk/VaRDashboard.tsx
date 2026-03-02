@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { postRiskVar } from '@/utils/api';
+import { downloadFile, generateFilename } from '@/utils/export';
 
 const SAMPLE_RETURNS = [
   [0.01, -0.005, 0.02],
@@ -19,6 +20,23 @@ export const VaRDashboard = () => {
   const [varResult, setVarResult] = useState<Record<string, unknown> | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const handleExport = (format: 'csv' | 'json') => {
+    if (!varResult) return;
+    const payload = {
+      timestamp: new Date().toISOString(),
+      inputs: { returns: SAMPLE_RETURNS.length, weights: WEIGHTS, alpha: 0.05, portfolio_value: 1_000_000 },
+      results: varResult,
+    };
+    if (format === 'json') {
+      const json = JSON.stringify(payload, null, 2);
+      downloadFile(json, generateFilename('var_report', 'json'), 'application/json');
+    } else {
+      const rows = [['Metric', 'Value'], ...Object.entries(varResult).map(([k, v]) => [k, String(v)])];
+      const csv = rows.map((r) => r.join(',')).join('\n');
+      downloadFile(csv, generateFilename('var_report', 'csv'), 'text/csv');
+    }
+  };
 
   const runVaR = async () => {
     setLoading(true);
@@ -44,15 +62,33 @@ export const VaRDashboard = () => {
   return (
     <div className="space-y-6">
       <div className="rounded-xl border border-slate-700 bg-slate-900/50 p-6">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
           <h3 className="text-lg font-semibold text-white">VaR & Expected Shortfall (M1 L2)</h3>
-          <button
+          <div className="flex gap-2">
+            {varResult && (
+              <>
+                <button
+                  onClick={() => handleExport('csv')}
+                  className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-sm"
+                >
+                  Export CSV
+                </button>
+                <button
+                  onClick={() => handleExport('json')}
+                  className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-sm"
+                >
+                  Export JSON
+                </button>
+              </>
+            )}
+            <button
             onClick={runVaR}
             disabled={loading}
             className="px-4 py-2 rounded-lg bg-primary-600 text-white text-sm font-medium hover:bg-primary-500 disabled:opacity-50"
           >
             {loading ? 'Computing…' : 'Compute VaR'}
           </button>
+          </div>
         </div>
 
         {error && (

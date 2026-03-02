@@ -3,6 +3,8 @@ import { Button } from '@/components/Button';
 import { ExportButton } from '@/components/ExportButton';
 import { MarketDataDashboard } from '@/components/MarketDataDashboard';
 import { useBlackScholesPricing, useFFTPricing } from '@/hooks/useApi';
+import { useSelectedAssets } from '@/context/SelectedAssetsContext';
+import { getAssetHistory } from '@/utils/api';
 import type { OptionRequest, FFTRequest } from '@/types';
 import { computeCallGreeks } from '@/utils/greeks';
 import { 
@@ -39,9 +41,32 @@ type PricingWorkspaceProps = {
 };
 
 export const PricingWorkspace = ({ defaultTab = 'bs' }: PricingWorkspaceProps) => {
+  const { selectedAssets } = useSelectedAssets();
   const [tab, setTab] = useState<'bs' | 'fft'>(defaultTab);
   const [optionRequest, setOptionRequest] = useState<OptionRequest>(defaultOptionRequest);
   const [fftState, setFFTState] = useState<FFTState>(defaultFFTState);
+
+  const firstAssetSymbol = selectedAssets[0]?.symbol;
+  // Sync spot (s) with selected asset's current price from market data
+  useEffect(() => {
+    if (!firstAssetSymbol) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const history = await getAssetHistory(firstAssetSymbol, '5d');
+        if (cancelled || !Array.isArray(history) || history.length === 0) return;
+        const lastRow = history[history.length - 1];
+        const close = lastRow?.close;
+        if (typeof close === 'number' && close > 0) {
+          setOptionRequest((prev) => ({ ...prev, s: close }));
+          setFFTState((prev) => ({ ...prev, s: close }));
+        }
+      } catch {
+        // Ignore: keep current manual values
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [firstAssetSymbol]);
 
   const {
     calculate: runBS,

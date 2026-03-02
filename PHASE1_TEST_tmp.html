@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>PHASE1_TEST.md</title>
+    <meta http-equiv="Content-type" content="text/html;charset=UTF-8">
+    
+<style>
+/* https://github.com/microsoft/vscode/blob/master/extensions/markdown-language-features/media/markdown.css */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+body {
+	font-family: var(--vscode-markdown-font-family, -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif);
+	font-size: var(--vscode-markdown-font-size, 14px);
+	padding: 0 26px;
+	line-height: var(--vscode-markdown-line-height, 22px);
+	word-wrap: break-word;
+}
+
+html,footer,header{
+	font-family: var(--vscode-markdown-font-family, -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif);
+	font-size: var(--vscode-markdown-font-size, 14px);
+}
+
+#code-csp-warning {
+	position: fixed;
+	top: 0;
+	right: 0;
+	color: white;
+	margin: 16px;
+	text-align: center;
+	font-size: 12px;
+	font-family: sans-serif;
+	background-color:#444444;
+	cursor: pointer;
+	padding: 6px;
+	box-shadow: 1px 1px 1px rgba(0,0,0,.25);
+}
+
+#code-csp-warning:hover {
+	text-decoration: none;
+	background-color:#007acc;
+	box-shadow: 2px 2px 2px rgba(0,0,0,.25);
+}
+
+body.scrollBeyondLastLine {
+	margin-bottom: calc(100vh - 22px);
+}
+
+body.showEditorSelection .code-line {
+	position: relative;
+}
+
+body.showEditorSelection .code-active-line:before,
+body.showEditorSelection .code-line:hover:before {
+	content: "";
+	display: block;
+	position: absolute;
+	top: 0;
+	left: -12px;
+	height: 100%;
+}
+
+body.showEditorSelection li.code-active-line:before,
+body.showEditorSelection li.code-line:hover:before {
+	left: -30px;
+}
+
+.vscode-light.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.15);
+}
+
+.vscode-light.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.40);
+}
+
+.vscode-light.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-dark.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.4);
+}
+
+.vscode-dark.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.60);
+}
+
+.vscode-dark.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-high-contrast.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 160, 0, 0.7);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 160, 0, 1);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+img {
+	max-width: 100%;
+	max-height: 100%;
+}
+
+a {
+	text-decoration: none;
+}
+
+a:hover {
+	text-decoration: underline;
+}
+
+a:focus,
+input:focus,
+select:focus,
+textarea:focus {
+	outline: 1px solid -webkit-focus-ring-color;
+	outline-offset: -1px;
+}
+
+hr {
+	border: 0;
+	height: 2px;
+	border-bottom: 2px solid;
+}
+
+h1 {
+	padding-bottom: 0.3em;
+	line-height: 1.2;
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+}
+
+h1, h2, h3 {
+	font-weight: normal;
+}
+
+table {
+	border-collapse: collapse;
+}
+
+table > thead > tr > th {
+	text-align: left;
+	border-bottom: 1px solid;
+}
+
+table > thead > tr > th,
+table > thead > tr > td,
+table > tbody > tr > th,
+table > tbody > tr > td {
+	padding: 5px 10px;
+}
+
+table > tbody > tr + tr > td {
+	border-top: 1px solid;
+}
+
+blockquote {
+	margin: 0 7px 0 5px;
+	padding: 0 16px 0 10px;
+	border-left-width: 5px;
+	border-left-style: solid;
+}
+
+code {
+	font-family: Menlo, Monaco, Consolas, "Droid Sans Mono", "Courier New", monospace, "Droid Sans Fallback";
+	font-size: 1em;
+	line-height: 1.357em;
+}
+
+body.wordWrap pre {
+	white-space: pre-wrap;
+}
+
+pre:not(.hljs),
+pre.hljs code > div {
+	padding: 16px;
+	border-radius: 3px;
+	overflow: auto;
+}
+
+pre code {
+	color: var(--vscode-editor-foreground);
+	tab-size: 4;
+}
+
+/** Theming */
+
+.vscode-light pre {
+	background-color: rgba(220, 220, 220, 0.4);
+}
+
+.vscode-dark pre {
+	background-color: rgba(10, 10, 10, 0.4);
+}
+
+.vscode-high-contrast pre {
+	background-color: rgb(0, 0, 0);
+}
+
+.vscode-high-contrast h1 {
+	border-color: rgb(0, 0, 0);
+}
+
+.vscode-light table > thead > tr > th {
+	border-color: rgba(0, 0, 0, 0.69);
+}
+
+.vscode-dark table > thead > tr > th {
+	border-color: rgba(255, 255, 255, 0.69);
+}
+
+.vscode-light h1,
+.vscode-light hr,
+.vscode-light table > tbody > tr + tr > td {
+	border-color: rgba(0, 0, 0, 0.18);
+}
+
+.vscode-dark h1,
+.vscode-dark hr,
+.vscode-dark table > tbody > tr + tr > td {
+	border-color: rgba(255, 255, 255, 0.18);
+}
+
+</style>
+
+<style>
+/* Tomorrow Theme */
+/* http://jmblog.github.com/color-themes-for-google-code-highlightjs */
+/* Original theme - https://github.com/chriskempson/tomorrow-theme */
+
+/* Tomorrow Comment */
+.hljs-comment,
+.hljs-quote {
+	color: #8e908c;
+}
+
+/* Tomorrow Red */
+.hljs-variable,
+.hljs-template-variable,
+.hljs-tag,
+.hljs-name,
+.hljs-selector-id,
+.hljs-selector-class,
+.hljs-regexp,
+.hljs-deletion {
+	color: #c82829;
+}
+
+/* Tomorrow Orange */
+.hljs-number,
+.hljs-built_in,
+.hljs-builtin-name,
+.hljs-literal,
+.hljs-type,
+.hljs-params,
+.hljs-meta,
+.hljs-link {
+	color: #f5871f;
+}
+
+/* Tomorrow Yellow */
+.hljs-attribute {
+	color: #eab700;
+}
+
+/* Tomorrow Green */
+.hljs-string,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-addition {
+	color: #718c00;
+}
+
+/* Tomorrow Blue */
+.hljs-title,
+.hljs-section {
+	color: #4271ae;
+}
+
+/* Tomorrow Purple */
+.hljs-keyword,
+.hljs-selector-tag {
+	color: #8959a8;
+}
+
+.hljs {
+	display: block;
+	overflow-x: auto;
+	color: #4d4d4c;
+	padding: 0.5em;
+}
+
+.hljs-emphasis {
+	font-style: italic;
+}
+
+.hljs-strong {
+	font-weight: bold;
+}
+</style>
+
+<style>
+/*
+ * Custom MD PDF CSS
+ */
+html,footer,header{
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif, "Meiryo";
+
+ }
+body {
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif, "Meiryo";
+	padding: 0 12px;
+}
+
+pre {
+	background-color: #f8f8f8;
+	border: 1px solid #cccccc;
+	border-radius: 3px;
+	overflow-x: auto;
+	white-space: pre-wrap;
+	overflow-wrap: break-word;
+}
+
+pre:not(.hljs) {
+	padding: 23px;
+	line-height: 19px;
+}
+
+blockquote {
+	background: rgba(127, 127, 127, 0.1);
+	border-color: rgba(0, 122, 204, 0.5);
+}
+
+.emoji {
+	height: 1.4em;
+}
+
+code {
+	font-size: 14px;
+	line-height: 19px;
+}
+
+/* for inline code */
+:not(pre):not(.hljs) > code {
+	color: #C9AE75; /* Change the old color so it seems less like an error */
+	font-size: inherit;
+}
+
+/* Page Break : use <div class="page"/> to insert page break
+-------------------------------------------------------- */
+.page {
+	page-break-after: always;
+}
+
+</style>
+<link rel="stylesheet" href="file:///r%3A/2.Travail/1.Enseignement/Cours/_1.Outils/2.Developpement/1.SCSS/main.css" type="text/css"><link rel="stylesheet" href="file:///d%3A/rdaros/Cours/_1.Outils/2.Developpement/1.SCSS/main.css" type="text/css">
+</head>
+
+<body>
+    <h1 id="transact-setup--test--phase-1--phase-2">Transact Setup &amp; Test — Phase 1 + Phase 2</h1>
+<h2 id="1-fix-venv-if-broken">1. Fix venv (if broken)</h2>
+<p>If <code>pip install</code> failed with <code>ModuleNotFoundError: No module named 'pip'</code>:</p>
+<ol>
+<li><strong>Close all terminals</strong> using the venv</li>
+<li>Delete the venv folder: <code>Remove-Item -Recurse -Force venv</code></li>
+<li>Create a fresh venv: <code>python -m venv venv</code></li>
+<li>Activate: <code>.\venv\Scripts\Activate.ps1</code></li>
+</ol>
+<h2 id="2-install-dependencies">2. Install dependencies</h2>
+<p><strong>Option A — Minimal (Phase 1 + 2):</strong></p>
+<pre class="hljs"><code><div>.\venv\Scripts\Activate.ps1
+python <span class="hljs-literal">-m</span> pip install setuptools wheel
+pip install fastapi <span class="hljs-string">"uvicorn[standard]"</span> pydantic numpy scipy pandas httpx requests cvxpy
+</div></code></pre>
+<p><strong>Option B — Full requirements:</strong></p>
+<pre class="hljs"><code><div>pip install <span class="hljs-literal">-r</span> requirements.txt
+</div></code></pre>
+<h2 id="3-start-the-backend">3. Start the backend</h2>
+<pre class="hljs"><code><div>cd c:\Users\USER\Downloads\Portfolio\psychic<span class="hljs-literal">-invention</span>
+.\venv\Scripts\Activate.ps1
+uvicorn app.main:app -<span class="hljs-literal">-reload</span>
+</div></code></pre>
+<p>API will run at <code>http://localhost:8000</code></p>
+<hr>
+<h2 id="4-phase-1-endpoints">4. Phase 1 endpoints</h2>
+<p>Open <code>http://localhost:8000/docs</code> and try:</p>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Body</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>POST /portfolio/moments</code></td>
+<td><code>{&quot;returns&quot;: [[0.01,-0.005,0.02],[0.02,0.01,-0.01],[0.015,0.02,0.01]], &quot;weights&quot;: [0.33,0.33,0.34]}</code></td>
+</tr>
+<tr>
+<td><code>POST /portfolio/performance</code></td>
+<td><code>{&quot;portfolio_returns&quot;: [0.01,0.02,-0.01,0.015], &quot;risk_free_rate&quot;: 0.02, &quot;portfolio_beta&quot;: 1.0}</code></td>
+</tr>
+<tr>
+<td><code>POST /risk/var</code></td>
+<td><code>{&quot;returns&quot;: [[0.01,-0.01],[0.02,0.005]], &quot;weights&quot;: [0.5,0.5], &quot;alpha&quot;: 0.05, &quot;portfolio_value&quot;: 1000000}</code></td>
+</tr>
+<tr>
+<td><code>POST /optimize/mvo</code></td>
+<td><code>{&quot;covariance&quot;: [[0.04,0.02],[0.02,0.09]], &quot;expected_returns&quot;: [0.08,0.12], &quot;risk_free_rate&quot;: 0.02}</code></td>
+</tr>
+<tr>
+<td><code>POST /optimize/mvo/frontier</code></td>
+<td><code>{&quot;covariance&quot;: [[0.04,0.02,0.01],[0.02,0.09,0.015],[0.01,0.015,0.06]], &quot;expected_returns&quot;: [0.08,0.12,0.06], &quot;risk_free_rate&quot;: 0.02, &quot;n_points&quot;: 50}</code></td>
+</tr>
+<tr>
+<td><code>POST /blotter/trade</code></td>
+<td><code>{&quot;asset&quot;: &quot;AAPL&quot;, &quot;direction&quot;: &quot;long&quot;, &quot;quantity&quot;: 100, &quot;entry_price&quot;: 150}</code></td>
+</tr>
+<tr>
+<td><code>POST /blotter/positions</code></td>
+<td><code>{&quot;current_prices&quot;: {&quot;AAPL&quot;: 155, &quot;MSFT&quot;: 400}}</code></td>
+</tr>
+<tr>
+<td><code>GET /blotter/history</code></td>
+<td>(no body)</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="5-phase-2-endpoints">5. Phase 2 endpoints</h2>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Body</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>POST /optimize/blm</code></td>
+<td><code>{&quot;covariance&quot;: [[0.04,0.02,0.01],[0.02,0.09,0.015],[0.01,0.015,0.06]], &quot;market_weights&quot;: [0.5,0.3,0.2], &quot;P&quot;: [[0,1,-1]], &quot;Q&quot;: [0.02], &quot;tau&quot;: 0.05, &quot;risk_free_rate&quot;: 0.02}</code></td>
+</tr>
+<tr>
+<td><code>POST /optimize/risk-parity</code></td>
+<td><code>{&quot;covariance&quot;: [[0.04,0.02],[0.02,0.09]], &quot;expected_returns&quot;: [0.08,0.12], &quot;rho&quot;: 0}</code></td>
+</tr>
+<tr>
+<td><code>POST /optimize/risk-parity</code> (RRP)</td>
+<td><code>{&quot;covariance&quot;: [[0.04,0.02],[0.02,0.09]], &quot;expected_returns&quot;: [0.08,0.12], &quot;rho&quot;: 0.3}</code></td>
+</tr>
+<tr>
+<td><code>POST /optimize/hrp</code></td>
+<td><code>{&quot;covariance&quot;: [[0.04,0.02,0.01],[0.02,0.09,0.015],[0.01,0.015,0.06]]}</code></td>
+</tr>
+<tr>
+<td><code>POST /optimize/kelly/single</code></td>
+<td><code>{&quot;p&quot;: 0.55, &quot;q&quot;: 0.45}</code> or <code>{&quot;p&quot;: 0.6, &quot;q&quot;: 0.4, &quot;a&quot;: 1, &quot;b&quot;: 2}</code></td>
+</tr>
+<tr>
+<td><code>POST /optimize/kelly</code></td>
+<td><code>{&quot;returns&quot;: [[0.01,-0.005],[0.02,0.01],[0.015,0.02],[0.005,-0.01]], &quot;fractional&quot;: 0.5}</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>BLM view matrix (P, Q):</strong></p>
+<ul>
+<li><code>P</code>: K×N pick matrix. Row <code>[0,1,-1]</code> = &quot;asset 1 minus asset 2&quot;</li>
+<li><code>Q</code>: K×1 view returns. <code>[0.02]</code> = &quot;outperform by 2%&quot;</li>
+</ul>
+<p><strong>Risk Parity rho:</strong></p>
+<ul>
+<li><code>rho=0</code>: pure ERC (Equal Risk Contribution)</li>
+<li><code>rho&gt;0</code>: Relaxed RRP, tilt toward higher returns</li>
+</ul>
+<hr>
+<h2 id="6-start-the-frontend">6. Start the frontend</h2>
+<pre class="hljs"><code><div>cd frontend
+npm install
+npm run dev
+</div></code></pre>
+<p>Open <code>http://localhost:3000/transact</code> for the full UI.</p>
+<hr>
+<h2 id="7-phase-3-endpoints">7. Phase 3 endpoints</h2>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Body</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>POST /factors/estimate</code></td>
+<td><code>{&quot;returns&quot;: [[0.01,-0.005],[0.02,0.01],[0.015,0.02]], &quot;factors&quot;: [[0.02],[-0.01],[0.015]]}</code></td>
+</tr>
+<tr>
+<td><code>POST /factors/fama-macbeth</code></td>
+<td>Same as above</td>
+</tr>
+<tr>
+<td><code>POST /portfolio/coskewness</code></td>
+<td><code>{&quot;returns&quot;: [[0.01,-0.01],[0.02,0.005],[0.015,0.01]], &quot;weights&quot;: [0.33,0.33,0.34]}</code></td>
+</tr>
+<tr>
+<td><code>POST /heston/calibrate</code></td>
+<td><code>{&quot;s&quot;: 100, &quot;r&quot;: 0.05, &quot;strikes&quot;: [95,100,105], &quot;expiries&quot;: [0.25,0.25,0.25], &quot;market_prices&quot;: [10,5,2]}</code></td>
+</tr>
+<tr>
+<td><code>POST /vol/implied-surface</code></td>
+<td>Same as heston (returns IV per option)</td>
+</tr>
+<tr>
+<td><code>POST /factors/smart-beta</code></td>
+<td><code>{&quot;factor_scores&quot;: [0.8,-0.3,0.5,0.2], &quot;returns&quot;: [[0.01],[0.02],[-0.01]], &quot;method&quot;: &quot;quintile&quot;}</code></td>
+</tr>
+<tr>
+<td><code>POST /factors/crowding</code></td>
+<td><code>{&quot;factor_loadings&quot;: [[0.9,0.1],[0.8,0.2],[0.7,0.3]]}</code></td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="8-phase-4-endpoints-scenarios--behavioral-blotter-attribution">8. Phase 4 endpoints (Scenarios &amp; Behavioral, Blotter Attribution)</h2>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Body</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>POST /scenarios/define</code></td>
+<td><code>{&quot;name&quot;: &quot;RateHike&quot;, &quot;return_shocks&quot;: [-0.01,-0.005,0], &quot;corr_shift&quot;: 0.2}</code></td>
+</tr>
+<tr>
+<td><code>POST /scenarios/run</code></td>
+<td><code>{&quot;returns&quot;: [[0.01,-0.005],[0.02,0.01]], &quot;weights&quot;: [0.5,0.5], &quot;historical&quot;: &quot;GFC_2008&quot;}</code></td>
+</tr>
+<tr>
+<td><code>POST /scenarios/probabilistic</code></td>
+<td><code>{&quot;scenario_returns&quot;: [[0.08,0.12],[0.02,0.03],[-0.05,-0.02]], &quot;scenario_probs&quot;: [0.5,0.3,0.2], &quot;target_return&quot;: 0.06}</code></td>
+</tr>
+<tr>
+<td><code>POST /scenarios/monte-carlo</code></td>
+<td><code>{&quot;returns&quot;: [[0.01,-0.005],[0.02,0.01],[0.015,0.02]], &quot;weights&quot;: [0.33,0.33,0.34], &quot;portfolio_value&quot;: 1000000, &quot;n_paths&quot;: 50000}</code></td>
+</tr>
+<tr>
+<td><code>POST /scenarios/behavioral</code></td>
+<td><code>{&quot;returns&quot;: [[0.01,-0.005],[0.02,0.01]], &quot;weights&quot;: [0.5,0.5], &quot;mode&quot;: &quot;prospect&quot;}</code> or <code>&quot;mode&quot;: &quot;herding&quot;, &quot;correlation_shift&quot;: 0.3</code></td>
+</tr>
+<tr>
+<td><code>POST /blotter/attribution</code></td>
+<td><code>{&quot;portfolio_returns&quot;: [0.01,0.02,-0.01], &quot;market_returns&quot;: [0.015,0.012,-0.005]}</code></td>
+</tr>
+<tr>
+<td><code>POST /blotter/pnl</code></td>
+<td><code>{&quot;current_prices&quot;: {&quot;AAPL&quot;: 155}}</code> or <code>{&quot;price_history&quot;: [{&quot;date&quot;:&quot;2024-01-01&quot;,&quot;prices&quot;:{&quot;AAPL&quot;:150}}]}</code></td>
+</tr>
+</tbody>
+</table>
+
+</body>
+
+</html>
