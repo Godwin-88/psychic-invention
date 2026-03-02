@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
+import { useSelectedAssets } from '@/context/SelectedAssetsContext';
 
 function getBreadcrumb(pathname: string): string[] {
   const segments = pathname.replace(/^\/transact\/?/, '').split('/').filter(Boolean);
@@ -25,6 +26,7 @@ export const TransactLayout = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const { selectedAssets } = useSelectedAssets();
   const breadcrumb = getBreadcrumb(location.pathname);
 
   return (
@@ -36,6 +38,15 @@ export const TransactLayout = () => {
 
       {/* Main workspace */}
       <div className="flex-1 flex flex-col overflow-hidden bg-slate-950">
+        {/* Context: selected assets drive all computations */}
+        <div className="flex items-center gap-2 px-6 py-2 border-b border-slate-800/40 bg-slate-900/20 shrink-0">
+          <span className="text-xs text-slate-500 uppercase tracking-wider">
+            {selectedAssets.length > 0
+              ? `Analyzing ${selectedAssets.map((a) => a.symbol).join(', ')}`
+              : 'Select up to 5 assets in the header to run analytics'}
+          </span>
+        </div>
+
         {/* Breadcrumb bar */}
         <div className="flex items-center gap-2 px-6 py-3 border-b border-slate-800/60 bg-slate-900/40 shrink-0">
           {breadcrumb.map((crumb, i) => (

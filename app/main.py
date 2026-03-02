@@ -38,6 +38,14 @@ except ImportError as e:
     print(f"Warning: Transact routes not available: {e}")
     TRANSACT_AVAILABLE = False
 
+# Import Asset Universe (yfinance-backed symbol search)
+try:
+    from .asset_universe import router as asset_universe_router
+    ASSET_UNIVERSE_AVAILABLE = True
+except ImportError as e:
+    print(f"Warning: Asset universe routes not available: {e}")
+    ASSET_UNIVERSE_AVAILABLE = False
+
 # Configure enhanced logging
 configure_logging(log_level="INFO", log_format="json")
 
@@ -76,11 +84,14 @@ if MARKET_DATA_AVAILABLE:
 # Include Transact Phase 1 router
 if TRANSACT_AVAILABLE:
     app.include_router(transact_router)
-    
     # Add cleanup handler
     @app.on_event("shutdown")
     async def shutdown_event():
         await cleanup_deriv_client()
+
+# Include Asset Universe (yfinance) router
+if ASSET_UNIVERSE_AVAILABLE:
+    app.include_router(asset_universe_router)
 
 # Add CORS middleware
 

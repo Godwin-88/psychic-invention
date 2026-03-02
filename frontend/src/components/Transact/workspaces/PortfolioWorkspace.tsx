@@ -2,6 +2,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { PortfolioBuilder } from '@/components/Portfolio/PortfolioBuilder';
 import { MomentsPanel } from '@/components/Portfolio/MomentsPanel';
 import { PerformanceAppraisalCard } from '@/components/Portfolio/PerformanceAppraisalCard';
+import { CoskewnessHeatmap } from '@/components/Portfolio/CoskewnessHeatmap';
 
 const subTabs = [
   { id: 'builder',     label: 'Asset Universe',        path: '/transact/portfolio' },
@@ -68,12 +69,7 @@ export const PortfolioWorkspace = () => {
         {activeTab === 'builder'     && <PortfolioBuilder />}
         {activeTab === 'moments'     && <MomentsPanel />}
         {activeTab === 'performance' && <PerformanceAppraisalCard />}
-        {activeTab === 'stats'       && (
-          <PlaceholderPanel
-            title="Higher-Order Statistics"
-            desc="Skewness, kurtosis, co-moments and higher-order risk measures for portfolio assets."
-          />
-        )}
+        {activeTab === 'stats'       && <CoskewnessHeatmap />}
         {activeTab === 'attribution' && (
           <PlaceholderPanel
             title="Return Attribution"

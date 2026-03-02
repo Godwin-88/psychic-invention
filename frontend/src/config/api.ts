@@ -7,6 +7,8 @@ export const API_CONFIG = {
     PRICE_PUT_BS: '/price/put/bs',
     PRICE_CALL_FFT: '/price/call/fft',
     PRICE_PUT_FFT: '/price/put/fft',
+    GREEKS_CALL: '/greeks/call',
+    GREEKS_PUT: '/greeks/put',
     // Market Data endpoints
     MARKET_DATA_HEALTH: '/market-data/health',
     MARKET_DATA_SPOT: '/market-data/spot',
@@ -46,6 +48,10 @@ export const API_CONFIG = {
     SCENARIOS_BEHAVIORAL: '/scenarios/behavioral',
     BLOTTER_ATTRIBUTION: '/blotter/attribution',
     BLOTTER_PNL: '/blotter/pnl',
+    // Asset Universe (yfinance)
+    ASSETS_TYPES: '/assets/types',
+    ASSETS_SEARCH: '/assets/search',
+    ASSETS_HISTORY: '/assets/history',
   },
   TIMEOUT: 10000,
 } as const;

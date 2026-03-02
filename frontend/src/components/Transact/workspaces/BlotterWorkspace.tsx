@@ -2,6 +2,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { TradeEntryForm } from '@/components/Blotter/TradeEntryForm';
 import { PositionTable } from '@/components/Blotter/PositionTable';
 import { AttributionCard } from '@/components/Blotter/AttributionCard';
+import { BlotterHistory } from '@/components/Blotter/BlotterHistory';
 
 const subTabs = [
   { id: 'entry',       label: 'Trade Entry',         path: '/transact/blotter' },
@@ -78,12 +79,7 @@ export const BlotterWorkspace = () => {
             <AttributionCard />
           </div>
         )}
-        {activeTab === 'history'     && (
-          <PlaceholderPanel
-            title="Transaction History"
-            desc="Full audit trail of all trades with timestamps, counterparties, prices, and execution details."
-          />
-        )}
+        {activeTab === 'history'     && <BlotterHistory />}
         {activeTab === 'export'      && (
           <PlaceholderPanel
             title="Export Centre"

@@ -43,3 +43,20 @@ export const computeCallGreeks = (request: OptionRequest): Greeks => {
 
   return { delta, gamma, theta, vega, rho };
 };
+
+export const computePutGreeks = (request: OptionRequest): Greeks => {
+  const { s, k, tau, r, sigma } = request;
+  if (tau <= 0 || sigma <= 0 || s <= 0 || k <= 0) {
+    return { delta: 0, gamma: 0, theta: 0, vega: 0, rho: 0 };
+  }
+  const sqrtTau = Math.sqrt(tau);
+  const d1 = (Math.log(s / k) + (r + 0.5 * sigma * sigma) * tau) / (sigma * sqrtTau);
+  const d2 = d1 - sigma * sqrtTau;
+  const pdfD1 = normPDF(d1);
+  const delta = normCDF(d1) - 1;
+  const gamma = pdfD1 / (s * sigma * sqrtTau);
+  const theta = (-s * pdfD1 * sigma) / (2 * sqrtTau) + r * k * Math.exp(-r * tau) * normCDF(-d2);
+  const vega = s * pdfD1 * sqrtTau;
+  const rho = -k * tau * Math.exp(-r * tau) * normCDF(-d2);
+  return { delta, gamma, theta, vega, rho };
+};
