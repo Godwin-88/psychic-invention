@@ -78,7 +78,7 @@ Real-time multi-model derivatives pricing workspace. Price calls/puts using thre
   - Enhanced FFT (Carr-Madan): auto-optimized α, n, Δv `POST /price/{call|put}/fft-optimized`
   - Heston: adaptive Simpson integration, Feller condition check `POST /price/{call|put}/heston`
 - Model agreement indicator: flag when |FFT - BS| > 1% or |Heston - BS| > threshold
-- Live pull from Deriv API for spot price (L1 cache 30s)
+- Live pull from openbb for spot price (L1 cache 30s)
 
 **3.1.2 Greeks Dashboard**
 - Display: Δ (Delta), Γ (Gamma), ν (Vega), Θ (Theta), ρ (Rho)
@@ -88,7 +88,7 @@ Real-time multi-model derivatives pricing workspace. Price calls/puts using thre
 - `POST /greeks/{call|put}` with `model: "bs" | "fft" | "heston"`
 
 **3.1.3 Option Chain View**
-- Table: Strike × Expiry grid with bid/ask (from Deriv API), theoretical price, IV
+- Table: Strike × Expiry grid with bid/ask (from openbb), theoretical price, IV
 - Color-coding: ITM (green), ATM (yellow), OTM (red)
 - Export to CSV/JSON
 
@@ -120,7 +120,7 @@ Define, build, and analyze a multi-asset portfolio. Compute all sample moments, 
 #### Key Features
 
 **3.2.1 Asset Universe & Weight Builder**
-- Asset selector: stocks, indices, currencies, commodities (via Deriv API multi-asset support)
+- Asset selector: stocks, indices, currencies, commodities (via openBB  multi-asset support)
 - Weight input: manual or drag-to-rebalance
 - Constraint display: weights sum to 1, optional short-selling toggle (w_i < 0 allowed/blocked)
 - Load from Optimizer results (two-way sync with Menu 4)

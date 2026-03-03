@@ -58,5 +58,5 @@ def compute_coskewness(returns: np.ndarray, weights: np.ndarray) -> CoskewnessRe
     return CoskewnessResult(
         portfolio_skewness=float(port_skew),
         coskewness_matrix=M3_heatmap,
-        excess_kurtosis_warning=kurtosis_warning,
+        excess_kurtosis_warning=bool(kurtosis_warning),  # numpy.bool_ → Python bool (numpy 2.x compat)
     )

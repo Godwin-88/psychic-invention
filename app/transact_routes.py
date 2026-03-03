@@ -25,8 +25,56 @@ from .factors.smart_beta import smart_beta_sort, smart_beta_signal_weighted
 from .factors.crowding import crowding_index
 from .higher_moments import compute_coskewness
 from .vol.calibration import heston_calibrate, implied_vol_bs
+from .risk.covariance import compute_covariance_health, compute_mst
+
+try:
+    import pricing_engine
+    HAS_PRICING = True
+except ImportError:
+    try:
+        import pricing_engine_mock as pricing_engine  # type: ignore
+        HAS_PRICING = True
+    except ImportError:
+        HAS_PRICING = False
 
 router = APIRouter(prefix="", tags=["transact"])
+
+# In-memory registration store (persists for session lifetime)
+_registrations: list[dict] = []
+
+
+# --- Marketplace Registration ---
+
+class MarketplaceRegistrationRequest(BaseModel):
+    menu_id: str
+    name: str
+    email: str
+    phone: Optional[str] = None
+    role: str
+    organization: Optional[str] = None
+
+
+@router.post("/marketplace/register")
+def marketplace_register(req: MarketplaceRegistrationRequest):
+    """Store a marketplace interest registration."""
+    import time
+    record = {
+        "menu_id": req.menu_id,
+        "name": req.name,
+        "email": req.email,
+        "phone": req.phone or "",
+        "role": req.role,
+        "organization": req.organization or "",
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }
+    _registrations.append(record)
+    return {"status": "ok", "message": f"Registration received for {req.menu_id}.", "count": len(_registrations)}
+
+
+@router.get("/marketplace/registrations")
+def marketplace_registrations():
+    """Return all registrations (admin view)."""
+    return {"registrations": _registrations, "count": len(_registrations)}
 
 
 # --- Portfolio ---
@@ -138,6 +186,135 @@ def post_risk_es(req: VaRRequest):
             req.mc_simulations,
         )
         return {"es": result["es"], "confidence": result["confidence"], "methods": result["methods"]}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# --- Risk: Covariance Health, MST, Greeks Aggregate ---
+
+class CovarianceHealthRequest(BaseModel):
+    returns: List[List[float]]  # T × N matrix
+
+
+class MSTRequest(BaseModel):
+    returns: List[List[float]]
+    labels: Optional[List[str]] = None
+
+
+class GreeksAggregateRequest(BaseModel):
+    positions: List[dict]       # [{asset, delta, gamma, vega, theta, quantity, spot_price}, ...]
+    alpha: float = 0.05         # tail probability (e.g. 0.05 → 95% VaR)
+    sigma_spot: float = 0.01    # daily spot vol as fraction (e.g. 0.01 = 1%)
+
+
+@router.post("/risk/covariance-health")
+def post_risk_covariance_health(req: CovarianceHealthRequest):
+    """Shrinkage, condition number, eigenspectrum, correlation heatmaps (M7 L1–3)."""
+    try:
+        res = compute_covariance_health(np.array(req.returns))
+        return {
+            "condition_number": res.condition_number,
+            "is_ill_conditioned": res.is_ill_conditioned,
+            "lw_shrinkage": res.lw_shrinkage,
+            "oas_shrinkage": res.oas_shrinkage,
+            "eigenvalues": res.eigenvalues,
+            "eigenvalue_fractions": res.eigenvalue_fractions,
+            "raw_correlation": res.raw_correlation,
+            "lw_correlation": res.lw_correlation,
+            "oas_correlation": res.oas_correlation,
+            "distance_matrix": res.distance_matrix,
+            "n_assets": res.n_assets,
+            "n_obs": res.n_obs,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/risk/mst")
+def post_risk_mst(req: MSTRequest):
+    """Minimum Spanning Tree of correlation-distance graph (M7 L3)."""
+    try:
+        res = compute_mst(np.array(req.returns), req.labels)
+        return {
+            "nodes": res.nodes,
+            "mst_edges": res.mst_edges,
+            "all_edges": res.all_edges,
+            "total_mst_distance": res.total_mst_distance,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/risk/greeks-aggregate")
+def post_risk_greeks_aggregate(req: GreeksAggregateRequest):
+    """
+    Portfolio-level Greeks aggregation + Delta-VaR and Gamma-adjusted VaR.
+    Delta-VaR: ΔW ≈ Δ_net · ΔS, ΔS ~ N(0, σ_spot · S)
+    Gamma-VaR: ΔW ≈ Δ_net · ΔS + ½ Γ_net · (ΔS)²  (M1 L2 §8)
+    """
+    try:
+        from scipy import stats as scipy_stats
+
+        q_alpha = float(scipy_stats.norm.ppf(req.alpha))   # negative quantile
+
+        net_delta = 0.0
+        net_gamma = 0.0
+        net_vega  = 0.0
+        net_theta = 0.0
+        positions_out = []
+
+        for pos in req.positions:
+            qty   = float(pos.get("quantity", 1))
+            delta = float(pos.get("delta", 0))
+            gamma = float(pos.get("gamma", 0))
+            vega  = float(pos.get("vega",  0))
+            theta = float(pos.get("theta", 0))
+            spot  = float(pos.get("spot_price", 1.0))
+
+            net_delta += delta * qty
+            net_gamma += gamma * qty
+            net_vega  += vega  * qty
+            net_theta += theta * qty
+
+            # Per-position delta-VaR (1-day): |δ · qty · σ_S · S · z_α|
+            dS_std   = req.sigma_spot * spot
+            pos_dvar = float(abs(delta * qty * dS_std * (-q_alpha)))
+
+            positions_out.append({
+                "asset": pos.get("asset", "?"),
+                "quantity": qty,
+                "delta": delta,
+                "gamma": gamma,
+                "vega":  vega,
+                "theta": theta,
+                "spot_price": spot,
+                "delta_var": pos_dvar,
+            })
+
+        # Portfolio delta-VaR (fractional spot move, no position size)
+        dS_frac = req.sigma_spot
+        delta_var_port = float(abs(net_delta * dS_frac * (-q_alpha)))
+
+        # Gamma-adjusted VaR via Monte Carlo (50 k paths)
+        n_sim = 50_000
+        delta_S_sim = np.random.normal(0.0, dS_frac, n_sim)
+        pnl_sim     = net_delta * delta_S_sim + 0.5 * net_gamma * delta_S_sim ** 2
+        losses_sim  = -pnl_sim
+        gamma_var   = float(np.percentile(losses_sim, req.alpha * 100))
+        gamma_es    = float(np.mean(losses_sim[losses_sim >= gamma_var]))
+
+        return {
+            "net_delta": float(net_delta),
+            "net_gamma": float(net_gamma),
+            "net_vega":  float(net_vega),
+            "net_theta": float(net_theta),
+            "delta_var":         float(delta_var_port),
+            "gamma_adjusted_var": float(gamma_var),
+            "gamma_adjusted_es":  float(gamma_es),
+            "confidence":  float(1 - req.alpha),
+            "sigma_spot":  float(req.sigma_spot),
+            "positions":   positions_out,
+        }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -427,9 +604,47 @@ def post_portfolio_coskewness(req: CoskewnessRequest):
     try:
         res = compute_coskewness(np.array(req.returns), np.array(req.weights))
         return {
-            "portfolio_skewness": res.portfolio_skewness,
-            "excess_kurtosis_warning": res.excess_kurtosis_warning,
+            "portfolio_skewness": float(res.portfolio_skewness),
+            "excess_kurtosis_warning": bool(res.excess_kurtosis_warning),
             "coskewness_matrix": res.coskewness_matrix.tolist(),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+class PortfolioAttributionRequest(BaseModel):
+    portfolio_returns: List[float]
+    market_returns: List[float]
+    risk_free_rate: float = 0.0
+    factor_betas: Optional[List[float]] = None
+    factor_returns: Optional[List[List[float]]] = None
+    factor_names: Optional[List[str]] = None
+
+
+@router.post("/portfolio/attribution")
+def post_portfolio_attribution(req: PortfolioAttributionRequest):
+    """Factor-based return attribution: r_p = α + β·r_m + Σ λ_k·β_k + ε (M1 §4, M2 §5)."""
+    try:
+        factor_b = np.array(req.factor_betas) if req.factor_betas else None
+        factor_r = np.array(req.factor_returns).T if req.factor_returns else None
+        res = performance_attribution(
+            np.array(req.portfolio_returns),
+            np.array(req.market_returns),
+            req.risk_free_rate,
+            factor_b,
+            factor_r,
+        )
+        factor_names = req.factor_names or [f"Factor {i+1}" for i in range(len(res.factor_returns))]
+        return {
+            "alpha": res.alpha,
+            "systematic_return": res.systematic_return,
+            "factor_contributions": [
+                {"name": factor_names[i] if i < len(factor_names) else f"Factor {i+1}", "contribution": v}
+                for i, v in enumerate(res.factor_returns)
+            ],
+            "residual": res.residual,
+            "total_return": res.total_return,
+            "decomposition": res.decomposition,
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -477,6 +692,138 @@ def post_vol_implied_surface(req: ImpliedSurfaceRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 
+class HestonSurfaceRequest(BaseModel):
+    v0: float = 0.04
+    kappa: float = 2.0
+    theta: float = 0.04
+    xi: float = 0.3
+    rho: float = -0.5
+    s: float = 100.0
+    r: float = 0.02
+    n_moneyness: int = 10
+    n_expiry: int = 8
+
+
+@router.post("/vol/heston-surface")
+def post_vol_heston_surface(req: HestonSurfaceRequest):
+    """Generate Heston-implied vol surface grid (moneyness × expiry)."""
+    try:
+        moneyness = np.linspace(0.7, 1.3, req.n_moneyness)  # K/S
+        expiries = np.linspace(0.1, 2.0, req.n_expiry)
+        iv_grid = []
+        for tau in expiries:
+            row = []
+            for m in moneyness:
+                k = m * req.s
+                price = 0.0
+                if HAS_PRICING:
+                    try:
+                        price = float(pricing_engine.price_heston_call(
+                            req.s, k, req.v0, req.r,
+                            req.kappa, req.theta, req.xi, req.rho, tau
+                        ))
+                    except Exception:
+                        price = 0.0
+                iv = implied_vol_bs(price, req.s, k, req.r, tau, "call") if price > 1e-6 else float(np.sqrt(req.v0))
+                row.append(round(iv, 5))
+            iv_grid.append(row)
+        # smile at mid expiry
+        mid = req.n_expiry // 2
+        smile = [{"moneyness": float(m), "iv": iv_grid[mid][i]} for i, m in enumerate(moneyness)]
+        # term structure at ATM
+        atm = req.n_moneyness // 2
+        term_structure = [{"expiry": float(tau), "iv": iv_grid[j][atm]} for j, tau in enumerate(expiries)]
+        return {
+            "moneyness": moneyness.tolist(),
+            "expiries": expiries.tolist(),
+            "iv_grid": iv_grid,
+            "smile": smile,
+            "term_structure": term_structure,
+            "feller_ok": bool(2 * req.kappa * req.theta > req.xi ** 2),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+class HistVolRequest(BaseModel):
+    returns: List[float]          # daily log-returns for one asset
+    window: int = 21              # rolling window (trading days)
+    annualise: bool = True
+
+
+@router.post("/vol/historical")
+def post_vol_historical(req: HistVolRequest):
+    """Rolling realised vol σ_r = √(252/w · Σr²) and optional implied-vol proxy."""
+    try:
+        r = np.array(req.returns)
+        T = len(r)
+        if T < req.window:
+            raise ValueError(f"Need ≥{req.window} observations, got {T}")
+        factor = 252 if req.annualise else 1
+        realized = []
+        for i in range(req.window, T + 1):
+            window_r = r[i - req.window:i]
+            rv = float(np.sqrt(factor / req.window * np.sum(window_r ** 2)))
+            realized.append(rv)
+        full_std = float(np.std(r) * np.sqrt(factor))
+        return {
+            "realized_vol": realized,
+            "full_period_vol": full_std,
+            "window": req.window,
+            "n_obs": T,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+class VolDecompRequest(BaseModel):
+    returns: List[List[float]]    # T × N
+    weights: List[float]          # N
+    market_returns: Optional[List[float]] = None  # T — if None use equal-weighted pf as proxy
+
+
+@router.post("/vol/factor-decompose")
+def post_vol_factor_decompose(req: VolDecompRequest):
+    """Decompose σ²_p into systematic (β²σ²_m) and idiosyncratic (w^TΣ_εw)."""
+    try:
+        R = np.array(req.returns)      # T×N
+        w = np.array(req.weights)
+        w = w / w.sum()
+        T, N = R.shape
+        if req.market_returns:
+            mkt = np.array(req.market_returns)
+        else:
+            mkt = R @ w  # portfolio itself as proxy
+        mkt_var = float(np.var(mkt, ddof=1))
+        # Per-asset betas and residual variances
+        betas, resid_vars, r2s = [], [], []
+        for i in range(N):
+            cov_im = float(np.cov(R[:, i], mkt, ddof=1)[0, 1])
+            beta_i = cov_im / mkt_var if mkt_var > 1e-12 else 0.0
+            resid = R[:, i] - beta_i * mkt
+            resid_vars.append(float(np.var(resid, ddof=1)))
+            betas.append(beta_i)
+            r2 = 1 - float(np.var(resid, ddof=1)) / max(float(np.var(R[:, i], ddof=1)), 1e-12)
+            r2s.append(max(r2, 0.0))
+        beta_p = float(w @ np.array(betas))
+        systematic_var = beta_p ** 2 * mkt_var * 252
+        idio_var = float(w @ np.diag(np.array(resid_vars)) @ w) * 252
+        total_var = systematic_var + idio_var
+        total_vol = float(np.sqrt(total_var)) if total_var > 0 else 0.0
+        return {
+            "systematic_vol": float(np.sqrt(systematic_var)) if systematic_var > 0 else 0.0,
+            "idiosyncratic_vol": float(np.sqrt(idio_var)) if idio_var > 0 else 0.0,
+            "total_vol": total_vol,
+            "systematic_pct": systematic_var / total_var if total_var > 0 else 0.0,
+            "idiosyncratic_pct": idio_var / total_var if total_var > 0 else 0.0,
+            "asset_betas": betas,
+            "asset_r_squared": r2s,
+            "portfolio_beta": beta_p,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.post("/factors/smart-beta")
 def post_factors_smart_beta(req: SmartBetaRequest):
     """Smart beta portfolio (M6 L2)."""
@@ -506,6 +853,60 @@ def post_factors_crowding(req: CrowdingRequest):
             "crowding_index": res.crowding_index,
             "level": res.level,
             "avg_correlation": res.avg_correlation,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+class PCARequest(BaseModel):
+    returns: List[List[float]]  # T × N
+    n_components: int = 5
+
+
+@router.post("/factors/pca")
+def post_factors_pca(req: PCARequest):
+    """PCA latent factor extraction (M6 L2 / ML Factor Discovery)."""
+    try:
+        R = np.array(req.returns)  # T × N
+        if R.ndim != 2 or R.shape[0] < 3:
+            raise ValueError("Need at least 3 time periods and 2 assets for PCA")
+        T, N = R.shape
+        # Standardise each column
+        mu = R.mean(axis=0)
+        sigma = R.std(axis=0, ddof=1)
+        sigma = np.where(sigma < 1e-12, 1.0, sigma)
+        R_std = (R - mu) / sigma
+
+        # Covariance of standardised returns = correlation matrix
+        C = np.cov(R_std.T, ddof=1)
+        if C.ndim == 0:
+            C = C.reshape(1, 1)
+        eigenvalues, eigenvectors = np.linalg.eigh(C)
+        # Sort descending
+        idx = np.argsort(eigenvalues)[::-1]
+        eigenvalues = eigenvalues[idx]
+        eigenvectors = eigenvectors[:, idx]
+
+        total_var = float(eigenvalues.sum())
+        if total_var < 1e-12:
+            total_var = 1.0
+        explained_ratio = (eigenvalues / total_var).tolist()
+        cumulative = np.cumsum(eigenvalues / total_var).tolist()
+
+        K = min(max(req.n_components, 1), N)
+        loadings = eigenvectors[:, :K].tolist()  # N × K
+
+        # How many components to explain >= 80% variance
+        comp_80 = int(np.searchsorted(cumulative, 0.80) + 1)
+
+        return {
+            "eigenvalues": eigenvalues[:K].tolist(),
+            "explained_variance_ratio": explained_ratio[:K],
+            "cumulative_variance": cumulative[:K],
+            "loadings": loadings,  # N × K
+            "n_components": K,
+            "components_for_80pct": min(comp_80, N),
+            "total_n_assets": N,
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

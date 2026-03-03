@@ -1,28 +1,145 @@
-import { useNavigate, useLocation } from 'react-router-dom';
-import { FactorLabPhase3 } from '@/components/FactorLab/FactorLabPhase3';
+/**
+ * Factor Lab Workspace — Menu 6
+ *
+ * ONE shared multi-asset DataSourcePanel at the top loads:
+ *   - N portfolio assets (≥2) price history → T×N log-returns matrix
+ *   - 1 benchmark asset (default: SPY) for market factor
+ *
+ * Sub-panels are route-driven:
+ *   /transact/factor                → FactorModelPanel  (OLS factor model)
+ *   /transact/factor/fama-macbeth   → FamaMacBethPanel  (two-pass FM)
+ *   /transact/factor/smart-beta     → SmartBetaPanel    (momentum tilt)
+ *   /transact/factor/herding        → HerdingPanel      (crowding risk)
+ *   /transact/factor/ml             → MLFactorPanel     (PCA discovery)
+ */
+import { useState } from 'react';
+import { useLocation } from 'react-router-dom';
+import { FactorProvider, useFactorContext } from '@/context/FactorContext';
+import { AssetSearchBar }    from '@/components/AssetSearchBar';
+import { FactorModelPanel }  from '@/components/FactorLab/FactorModelPanel';
+import { FamaMacBethPanel }  from '@/components/FactorLab/FamaMacBethPanel';
+import { SmartBetaPanel }    from '@/components/FactorLab/SmartBetaPanel';
+import { HerdingPanel }      from '@/components/FactorLab/HerdingPanel';
+import { MLFactorPanel }     from '@/components/FactorLab/MLFactorPanel';
 
-const subTabs = [
-  { id: 'models',     label: 'Factor Models',       path: '/transact/factor' },
-  { id: 'fmb',        label: 'Fama-MacBeth',        path: '/transact/factor/fama-macbeth' },
-  { id: 'smart-beta', label: 'Smart Beta',          path: '/transact/factor/smart-beta' },
-  { id: 'herding',    label: 'Herding Risk',        path: '/transact/factor/herding' },
-  { id: 'ml',         label: 'ML Factor Discovery', path: '/transact/factor/ml' },
-];
+// ── Panel metadata ─────────────────────────────────────────────────────────────
+const PANEL_META: Record<string, { title: string; badge: string; desc: string }> = {
+  models:       { title: 'Factor Model Builder',    badge: 'M2 L4 · OLS',         desc: 'R_it = α_i + β_i^T f_t + ε_it · systematic vs idiosyncratic decomposition' },
+  fmb:          { title: 'Fama-MacBeth Regression', badge: 'M6 L1 · Two-Pass',    desc: 'Stage 1: time-series betas · Stage 2: cross-sectional risk premia λ̂' },
+  'smart-beta': { title: 'Smart Beta Construction', badge: 'M6 L2 · Momentum',    desc: 'Factor-tilted portfolios: quintile sort & signal-weighted on momentum' },
+  herding:      { title: 'Herding Risk Monitor',    badge: 'M6 L2 · Khandani-Lo', desc: 'Factor crowding index · 2007 Quant Meltdown context · pairwise |ρ|' },
+  ml:           { title: 'ML Factor Discovery',     badge: 'PCA · Latent',        desc: 'PCA on return matrix · scree plot · 80% variance rule · loadings heatmap' },
+};
 
-const PlaceholderPanel = ({ title, desc }: { title: string; desc: string }) => (
-  <div className="flex flex-col items-center justify-center h-80 gap-4 text-center">
-    <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-3xl">🧬</div>
-    <div>
-      <p className="text-lg font-bold text-white">{title}</p>
-      <p className="text-sm text-slate-500 mt-1 max-w-xs">{desc}</p>
+// ── Shared Data Source Panel ─────────────────────────────────────────────────
+function DataSourcePanel() {
+  const {
+    symbols, returnMatrix, benchmarkSymbol, period, setPeriod,
+    multiLoading, fetchMultiAssets, error, clearError,
+  } = useFactorContext();
+
+  const [chips,     setChips]     = useState<string[]>(symbols.length ? [...symbols] : []);
+  const [benchmark, setBenchmark] = useState(benchmarkSymbol);
+
+  const handleFetch = async () => {
+    if (chips.length < 2) return;
+    clearError();
+    await fetchMultiAssets(chips, benchmark, period);
+  };
+
+  return (
+    <div className="rounded-xl border border-amber-800/40 bg-amber-900/5 p-4 space-y-3">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <p className="text-sm font-semibold text-slate-200">Data Source</p>
+        {symbols.length > 0 && (
+          <div className="flex items-center gap-3 text-xs text-slate-400">
+            <span>
+              {symbols.length} assets ·
+              <span className="font-mono text-amber-300 ml-1">{symbols.join(', ')}</span>
+            </span>
+            {returnMatrix.length > 0 && <span className="text-slate-500">{returnMatrix.length} obs</span>}
+            <span>factor: <span className="font-mono text-cyan-300">{benchmark}</span></span>
+          </div>
+        )}
+      </div>
+
+      {/* Portfolio assets (multi) */}
+      <div>
+        <p className="text-[10px] text-slate-500 mb-1 uppercase tracking-wider">Portfolio Assets (≥2)</p>
+        <AssetSearchBar
+          chips={chips}
+          onAdd={sym => setChips(prev => prev.includes(sym) ? prev : [...prev, sym])}
+          onRemove={sym => setChips(prev => prev.filter(s => s !== sym))}
+          maxChips={10}
+          accentBg="bg-amber-900/40"
+          accentBorder="border-amber-700/50"
+          accentText="text-amber-200"
+        />
+      </div>
+
+      {/* Benchmark + period + fetch */}
+      <div className="flex flex-wrap items-end gap-4">
+        <div>
+          <p className="text-[10px] text-slate-500 mb-1 uppercase tracking-wider">Benchmark / Market Factor</p>
+          <input
+            value={benchmark}
+            onChange={e => setBenchmark(e.target.value.toUpperCase())}
+            placeholder="SPY"
+            className="w-28 rounded-lg bg-slate-800 border border-slate-700 text-white text-sm px-3 py-1.5 focus:outline-none focus:border-amber-500 font-mono"
+          />
+        </div>
+
+        <div>
+          <p className="text-[10px] text-slate-500 mb-1 uppercase tracking-wider">Period</p>
+          <div className="flex gap-1">
+            {['1y', '2y', '3y', '5y'].map(p => (
+              <button key={p} onClick={() => setPeriod(p)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                  period === p
+                    ? 'bg-amber-700 text-white'
+                    : 'bg-slate-800 text-slate-400 hover:text-white border border-slate-700'
+                }`}>{p}</button>
+            ))}
+          </div>
+        </div>
+
+        <button
+          onClick={handleFetch}
+          disabled={chips.length < 2 || multiLoading}
+          className="px-4 py-1.5 rounded-lg bg-amber-600 text-white text-sm font-medium hover:bg-amber-500 disabled:opacity-40 transition flex items-center gap-2"
+        >
+          {multiLoading
+            ? <><svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+              </svg>Fetching…</>
+            : 'Fetch Live Data'}
+        </button>
+
+        {chips.length < 2 && (
+          <p className="text-xs text-amber-400">Select at least 2 assets for factor analysis</p>
+        )}
+      </div>
+
+      {error && (
+        <div className="rounded-lg border border-red-800 bg-red-900/20 p-2 text-red-300 text-xs flex items-center justify-between">
+          {error}
+          <button onClick={clearError} className="ml-2 text-red-400 hover:text-red-200 text-sm leading-none">×</button>
+        </div>
+      )}
+
+      {!symbols.length && !multiLoading && (
+        <p className="text-xs text-slate-600">
+          Add 2–10 equities (e.g. AAPL, MSFT, GOOGL, JPM) + a benchmark (SPY). Price history fetched live from yfinance.
+        </p>
+      )}
     </div>
-    <span className="px-3 py-1 rounded-full text-xs bg-slate-800 text-slate-400 border border-slate-700">Panel active</span>
-  </div>
-);
+  );
+}
 
-export const FactorWorkspace = () => {
+// ── Inner workspace ───────────────────────────────────────────────────────────
+function FactorWorkspaceInner() {
   const location = useLocation();
-  const navigate = useNavigate();
 
   function getActiveTab() {
     if (location.pathname.includes('/fama-macbeth')) return 'fmb';
@@ -32,61 +149,40 @@ export const FactorWorkspace = () => {
     return 'models';
   }
   const activeTab = getActiveTab();
+  const meta = PANEL_META[activeTab];
 
   return (
     <div className="p-6 space-y-6">
+      {/* Header */}
       <div>
         <div className="flex items-center gap-3 mb-1">
           <span className="text-2xl">🧬</span>
           <h1 className="text-2xl font-black text-white">Factor Lab</h1>
-          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-500/10 text-amber-300 border border-amber-500/20">M2 · M6</span>
+          <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-500/10 text-amber-300 border border-amber-500/20">
+            {meta.badge}
+          </span>
         </div>
-        <p className="text-sm text-slate-400 ml-9">Factor model construction, Fama-MacBeth, smart beta strategies, and ML factor discovery</p>
+        <p className="text-sm text-slate-400 ml-9">{meta.desc}</p>
       </div>
 
-      <div className="flex gap-1 p-1 bg-slate-900 rounded-xl border border-slate-800 w-fit">
-        {subTabs.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => navigate(tab.path)}
-            className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all duration-150 ${
-              activeTab === tab.id
-                ? 'bg-amber-600 text-white shadow-sm'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      {/* Shared data source */}
+      <DataSourcePanel />
 
+      {/* Active panel */}
       <div className="min-h-[500px]">
-        {activeTab === 'models'     && <FactorLabPhase3 />}
-        {activeTab === 'fmb'        && (
-          <PlaceholderPanel
-            title="Fama-MacBeth Regression"
-            desc="Two-pass cross-sectional regression for factor risk premia estimation across time series."
-          />
-        )}
-        {activeTab === 'smart-beta' && (
-          <PlaceholderPanel
-            title="Smart Beta Construction"
-            desc="Build factor-tilted indices: value, momentum, quality, low-volatility, and size strategies."
-          />
-        )}
-        {activeTab === 'herding'    && (
-          <PlaceholderPanel
-            title="Herding Risk Monitor"
-            desc="Detect crowding in factor exposures and monitor herd behaviour risk in portfolio construction."
-          />
-        )}
-        {activeTab === 'ml'         && (
-          <PlaceholderPanel
-            title="ML Factor Discovery"
-            desc="Use PCA, autoencoders, and regularised regression to discover latent risk factors from data."
-          />
-        )}
+        {activeTab === 'models'      && <FactorModelPanel />}
+        {activeTab === 'fmb'         && <FamaMacBethPanel />}
+        {activeTab === 'smart-beta'  && <SmartBetaPanel />}
+        {activeTab === 'herding'     && <HerdingPanel />}
+        {activeTab === 'ml'          && <MLFactorPanel />}
       </div>
     </div>
   );
-};
+}
+
+// ── Exported workspace (wraps provider) ──────────────────────────────────────
+export const FactorWorkspace = () => (
+  <FactorProvider>
+    <FactorWorkspaceInner />
+  </FactorProvider>
+);

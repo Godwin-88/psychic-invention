@@ -1,5 +1,4 @@
 use pyo3::prelude::*;
-use pyo3::wrap_pyfunction;
 
 pub mod black_scholes;
 pub mod monte_carlo;
@@ -19,7 +18,7 @@ mod greeks_tests;
 mod greeks_core_tests;
 
 #[pymodule]
-pub fn pricing_engine(_py: Python, m: &PyModule) -> PyResult<()> {
+pub fn pricing_engine(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Phase 1 - Black-Scholes (Optimized)
     m.add_function(wrap_pyfunction!(black_scholes::price_call, m)?)?;
     m.add_function(wrap_pyfunction!(black_scholes::price_put, m)?)?;

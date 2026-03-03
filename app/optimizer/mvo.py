@@ -58,7 +58,7 @@ def _solve_qp(
         constraints.append(mu @ w >= target_return)
 
     prob = cp.Problem(objective, constraints)
-    prob.solve(solver=cp.ECOS, verbose=False)
+    prob.solve(verbose=False)
 
     if prob.status not in ["optimal", "optimal_inaccurate"]:
         raise ValueError(f"QP failed: {prob.status}")

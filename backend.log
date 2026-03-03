@@ -1,0 +1,285 @@
+INFO:     Will watch for changes in these directories: ['C:\\Users\\ThinkPad\\Documents\\WQU\\PortFolio Management\\psychic-invention\\app']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [17208] using WatchFiles
+{"check_name": "pricing_engine_basic", "event": "Health check registered", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:08:01.021975Z"}
+{"check_name": "pricing_models", "event": "Health check registered", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:08:01.024929Z"}
+{"check_name": "greeks_calculation", "event": "Health check registered", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:08:01.026696Z"}
+{"check_name": "market_data_api", "event": "Health check registered", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:08:01.027982Z"}
+{"check_name": "system_resources", "event": "Health check registered", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:08:01.028494Z"}
+INFO:     Started server process [25668]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:08:46.480489Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:08:48.502229Z"}
+INFO:     127.0.0.1:51889 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53864 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53864 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:65058 - "GET /docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65058 - "GET /openapi.json HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:14:17.020854Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:14:19.154723Z"}
+INFO:     127.0.0.1:62329 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56684 - "GET /assets/types HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50542 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56684 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62329 - "GET /assets/types HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50542 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50542 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62329 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:14:50.273063Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:14:52.306014Z"}
+INFO:     127.0.0.1:53179 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55210 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:15:50.262903Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:15:52.293043Z"}
+INFO:     127.0.0.1:63295 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52295 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:16:50.281304Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:16:52.323599Z"}
+INFO:     127.0.0.1:52138 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53818 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:17:50.268440Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:17:52.321330Z"}
+INFO:     127.0.0.1:53667 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54740 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:18:50.269007Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:18:52.308691Z"}
+INFO:     127.0.0.1:59768 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64760 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:19:50.277803Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:19:52.318690Z"}
+INFO:     127.0.0.1:57919 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49582 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54628 - "GET /assets/search?q=EUR&type=currency&count=50 HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:20:49.955673Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:20:52.004895Z"}
+INFO:     127.0.0.1:54628 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64880 - "GET /assets/history?symbol=GBPEUR%3DX&period=5d HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63524 - "GET /assets/history?symbol=GBPEUR%3DX&period=5d HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63524 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:21:50.990175Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:21:53.084676Z"}
+INFO:     127.0.0.1:54657 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58221 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:22:50.988777Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:22:53.014269Z"}
+INFO:     127.0.0.1:64467 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58578 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:24:02.135048Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:24:04.178783Z"}
+INFO:     127.0.0.1:54599 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57418 - "GET /assets/history?symbol=GBPEUR%3DX&period=5d HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54599 - "GET /assets/history?symbol=GBPEUR%3DX&period=5d HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54599 - "GET /assets/history?symbol=GBPEUR%3DX&period=5d HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57418 - "GET /assets/history?symbol=GBPEUR%3DX&period=5d HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61566 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:24:50.682398Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:24:52.719841Z"}
+INFO:     127.0.0.1:64064 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58999 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:26:19.702686Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:26:21.736769Z"}
+INFO:     127.0.0.1:53754 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:27:20.022498Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:27:22.070397Z"}
+INFO:     127.0.0.1:61408 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:28:19.704277Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:28:21.768414Z"}
+INFO:     127.0.0.1:49837 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:29:20.038845Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:29:22.081220Z"}
+INFO:     127.0.0.1:51534 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:30:19.680595Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:30:21.708038Z"}
+INFO:     127.0.0.1:49239 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:31:20.020002Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:31:22.062470Z"}
+INFO:     127.0.0.1:63852 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:32:19.701526Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:32:21.760101Z"}
+INFO:     127.0.0.1:60169 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:33:19.699269Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:33:21.723056Z"}
+INFO:     127.0.0.1:59001 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62319 - "GET /assets/history?symbol=GBPEUR%3DX&period=5d HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59001 - "GET /assets/history?symbol=GBPEUR%3DX&period=5d HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:35:38.047304Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:35:40.105624Z"}
+INFO:     127.0.0.1:53525 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62319 - "GET /assets/types HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55769 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53525 - "GET /assets/types HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52162 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62598 - "GET /market-data/symbols HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62598 - "GET /market-data/symbols HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:36:37.738861Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:36:39.803192Z"}
+INFO:     127.0.0.1:55564 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52004 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:37:37.736374Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:37:39.794575Z"}
+INFO:     127.0.0.1:62092 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62092 - "OPTIONS /portfolio/moments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62092 - "OPTIONS /portfolio/performance HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62092 - "POST /portfolio/moments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62092 - "POST /portfolio/performance HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65524 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:38:38.678128Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:38:40.747563Z"}
+INFO:     127.0.0.1:56366 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:39:13.307443Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:39:15.363991Z"}
+INFO:     127.0.0.1:50658 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57067 - "GET /assets/search?q=e&type=currency&count=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57067 - "GET /assets/search?q=eur&type=currency&count=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57067 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57067 - "POST /portfolio/moments HTTP/1.1" 400 Bad Request
+INFO:     127.0.0.1:57067 - "POST /portfolio/performance HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50481 - "GET /assets/history?symbol=EURUSD%3DX&period=5d HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50481 - "GET /assets/history?symbol=EURUSD%3DX&period=5d HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:40:08.675120Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:40:10.700837Z"}
+INFO:     127.0.0.1:54623 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53165 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:41:19.700836Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:41:21.758037Z"}
+INFO:     127.0.0.1:53255 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:42:19.994023Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:42:22.019732Z"}
+INFO:     127.0.0.1:50499 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:43:19.694278Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:43:21.758739Z"}
+INFO:     127.0.0.1:59370 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:44:19.988990Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:44:22.018772Z"}
+INFO:     127.0.0.1:52877 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:45:19.702516Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:45:21.749131Z"}
+INFO:     127.0.0.1:61609 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:46:20.010774Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:46:22.055670Z"}
+INFO:     127.0.0.1:54483 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:47:19.695576Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:47:21.750494Z"}
+INFO:     127.0.0.1:52000 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:48:20.007251Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:48:22.044584Z"}
+INFO:     127.0.0.1:64767 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:49:19.701091Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:49:21.758679Z"}
+INFO:     127.0.0.1:59400 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:50:19.996072Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:50:22.009109Z"}
+INFO:     127.0.0.1:49310 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:51:19.688865Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:51:21.701365Z"}
+INFO:     127.0.0.1:61976 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:52:20.002835Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:52:22.012424Z"}
+INFO:     127.0.0.1:56194 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:53:19.685573Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:53:21.703094Z"}
+INFO:     127.0.0.1:50060 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:54:19.982699Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:54:21.992122Z"}
+INFO:     127.0.0.1:63262 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:55:19.688851Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:55:21.709409Z"}
+INFO:     127.0.0.1:55083 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:56:19.986660Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:56:22.003293Z"}
+INFO:     127.0.0.1:65219 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:57:19.680317Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:57:21.696443Z"}
+INFO:     127.0.0.1:51726 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:58:19.986368Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:58:21.998548Z"}
+INFO:     127.0.0.1:62893 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:59:19.685977Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T09:59:21.887678Z"}
+INFO:     127.0.0.1:52752 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:00:20.002733Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:00:22.020352Z"}
+INFO:     127.0.0.1:57909 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:01:19.676597Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:01:21.692965Z"}
+INFO:     127.0.0.1:57910 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:02:19.980017Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:02:21.991250Z"}
+INFO:     127.0.0.1:49571 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:03:19.679466Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:03:21.697302Z"}
+INFO:     127.0.0.1:59205 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:04:20.004445Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:04:22.016946Z"}
+INFO:     127.0.0.1:59801 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:05:19.682320Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:05:21.695501Z"}
+INFO:     127.0.0.1:53454 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:06:20.016483Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:06:22.028712Z"}
+INFO:     127.0.0.1:52500 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:07:19.700296Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:07:21.724467Z"}
+INFO:     127.0.0.1:59205 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:08:19.980254Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:08:21.996205Z"}
+INFO:     127.0.0.1:51409 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:09:19.672964Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:09:21.682834Z"}
+INFO:     127.0.0.1:54486 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:10:19.983573Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:10:21.997554Z"}
+INFO:     127.0.0.1:51928 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:11:19.694065Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:11:21.724351Z"}
+INFO:     127.0.0.1:54106 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:12:19.989465Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:12:21.999498Z"}
+INFO:     127.0.0.1:50670 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:13:19.683265Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:13:21.698090Z"}
+INFO:     127.0.0.1:63722 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:14:19.989653Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:14:21.998819Z"}
+INFO:     127.0.0.1:61264 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:15:19.686567Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:15:21.700643Z"}
+INFO:     127.0.0.1:65404 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:16:19.988307Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:16:22.001819Z"}
+INFO:     127.0.0.1:51040 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:17:19.684412Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:17:21.702581Z"}
+INFO:     127.0.0.1:61286 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:18:19.993837Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:18:22.039252Z"}
+INFO:     127.0.0.1:56508 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:19:19.677068Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:19:21.692913Z"}
+INFO:     127.0.0.1:65398 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:20:19.992297Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:20:22.022775Z"}
+INFO:     127.0.0.1:50227 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:21:19.675102Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:21:21.688861Z"}
+INFO:     127.0.0.1:64856 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:22:20.001216Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:22:22.014490Z"}
+INFO:     127.0.0.1:49246 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:23:19.760883Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:23:21.783524Z"}
+INFO:     127.0.0.1:54336 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:24:19.996316Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:24:22.012532Z"}
+INFO:     127.0.0.1:53304 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:25:19.683432Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:25:21.698094Z"}
+INFO:     127.0.0.1:49920 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:26:19.982324Z"}
+{"overall_status": "degraded", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:26:21.997277Z"}
+INFO:     127.0.0.1:55015 - "GET /health HTTP/1.1" 200 OK
+{"check_count": 5, "event": "Running comprehensive health checks", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:27:04.677680Z"}
+{"overall_status": "unhealthy", "check_count": 5, "event": "Health check completed", "logger": "app.health_check", "level": "info", "timestamp": "2026-03-02T10:27:06.904477Z"}
+INFO:     127.0.0.1:57396 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52076 - "GET /health HTTP/1.1" 200 OK

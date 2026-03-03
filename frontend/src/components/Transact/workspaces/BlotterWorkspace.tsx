@@ -1,16 +1,9 @@
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { TradeEntryForm } from '@/components/Blotter/TradeEntryForm';
 import { PositionTable } from '@/components/Blotter/PositionTable';
 import { AttributionCard } from '@/components/Blotter/AttributionCard';
 import { BlotterHistory } from '@/components/Blotter/BlotterHistory';
 
-const subTabs = [
-  { id: 'entry',       label: 'Trade Entry',         path: '/transact/blotter' },
-  { id: 'positions',   label: 'Position Monitor',    path: '/transact/blotter/positions' },
-  { id: 'attribution', label: 'P&L Attribution',     path: '/transact/blotter/attribution' },
-  { id: 'history',     label: 'Transaction History', path: '/transact/blotter/history' },
-  { id: 'export',      label: 'Export',              path: '/transact/blotter/export' },
-];
 
 const PlaceholderPanel = ({ title, desc }: { title: string; desc: string }) => (
   <div className="flex flex-col items-center justify-center h-80 gap-4 text-center">
@@ -25,7 +18,6 @@ const PlaceholderPanel = ({ title, desc }: { title: string; desc: string }) => (
 
 export const BlotterWorkspace = () => {
   const location = useLocation();
-  const navigate = useNavigate();
 
   function getActiveTab() {
     if (location.pathname.includes('/positions'))   return 'positions';
@@ -47,21 +39,6 @@ export const BlotterWorkspace = () => {
         <p className="text-sm text-slate-400 ml-9">Trade entry, real-time position monitoring, P&L attribution, and export</p>
       </div>
 
-      <div className="flex flex-wrap gap-1 p-1 bg-slate-900 rounded-xl border border-slate-800 w-fit">
-        {subTabs.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => navigate(tab.path)}
-            className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all duration-150 ${
-              activeTab === tab.id
-                ? 'bg-slate-600 text-white shadow-sm'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
 
       <div className="min-h-[500px]">
         {activeTab === 'entry'       && (

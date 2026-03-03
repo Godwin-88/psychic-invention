@@ -37,7 +37,6 @@ def reverse_optimization(
     w_m = np.asarray(market_weights).flatten()
     cov = np.asarray(cov)
     sigma_m = np.sqrt(w_m @ cov @ w_m)
-    mu_m = float(w_m @ np.mean(np.diag(cov)) * np.ones(len(w_m)))  # placeholder
     if risk_aversion is None:
         risk_aversion = 2.5  # typical value
     pi = risk_aversion * (cov @ w_m)
@@ -101,7 +100,7 @@ def blm_optimize(
         constraints.append(w >= 0)
 
     prob = cp.Problem(objective, constraints)
-    prob.solve(solver=cp.ECOS, verbose=False)
+    prob.solve(verbose=False)
 
     if prob.status not in ["optimal", "optimal_inaccurate"]:
         raise ValueError(f"BLM QP failed: {prob.status}")

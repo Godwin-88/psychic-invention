@@ -8,9 +8,10 @@ crate-type = ["cdylib"]
 
 
 [dependencies]
-pyo3 = { version = "0.17", features = ["extension-module", "macros"] }
+# 0.22 is the first PyO3 release with Python 3.13 support.
+# gil-refs keeps the old &PyModule / PyObject / into_py APIs working.
+pyo3 = { version = "0.22", features = ["extension-module", "macros", "gil-refs"] }
 statrs = "0.18.0"    # for normal CDF (Gaussian)
-numpy = "0.17.2"  
 rand = "0.9.1"
 rand_distr = "0.5.1"
 rayon = { version = "1.10.0"}  # optional for parallel

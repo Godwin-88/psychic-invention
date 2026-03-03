@@ -50,25 +50,12 @@ except ImportError as e:
 configure_logging(log_level="INFO", log_format="json")
 
 app = FastAPI(
-    title="Derivatives Pricing Engine", 
+    title="Derivatives Pricing Engine",
     version="1.0.0",
     description="High-performance derivatives pricing engine with comprehensive error handling and monitoring"
 )
 
-# Add request ID middleware for error tracking
-@app.middleware("http")
-async def add_request_id(request: Request, call_next):
-    request_id = str(uuid.uuid4())
-    request.state.request_id = request_id
-    
-    start_time = time.time()
-    response = await call_next(request)
-    process_time = time.time() - start_time
-    
-    response.headers["X-Request-ID"] = request_id
-    response.headers["X-Process-Time"] = str(process_time)
-    
-    return response
+# CORS must be the outermost middleware — add it first
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
@@ -76,6 +63,21 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Request ID middleware (inner — runs after CORS)
+@app.middleware("http")
+async def add_request_id(request: Request, call_next):
+    request_id = str(uuid.uuid4())
+    request.state.request_id = request_id
+
+    start_time = time.time()
+    response = await call_next(request)
+    process_time = time.time() - start_time
+
+    response.headers["X-Request-ID"] = request_id
+    response.headers["X-Process-Time"] = str(process_time)
+
+    return response
 
 # Include market data router if available
 if MARKET_DATA_AVAILABLE:
@@ -93,7 +95,6 @@ if TRANSACT_AVAILABLE:
 if ASSET_UNIVERSE_AVAILABLE:
     app.include_router(asset_universe_router)
 
-# Add CORS middleware
 
 class OptionRequest(BaseModel):
     s: float  # Current stock price

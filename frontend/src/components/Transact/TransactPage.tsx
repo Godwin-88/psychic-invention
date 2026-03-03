@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { PortfolioBuilder } from '@/components/Portfolio/PortfolioBuilder';
-import { VaRDashboard } from '../Risk/VaRDashboard';
+import { RiskWorkspace } from './workspaces/RiskWorkspace';
 import { EfficientFrontierChart } from '@/components/Optimizer/EfficientFrontierChart';
-import { ScenarioLabPhase4 } from '@/components/Scenarios/ScenarioLabPhase4';
+import { ScenariosWorkspace } from './workspaces/ScenariosWorkspace';
 import { TradeEntryForm } from '@/components/Blotter/TradeEntryForm';
 import { PositionTable } from '@/components/Blotter/PositionTable';
 import { AttributionCard } from '@/components/Blotter/AttributionCard';
@@ -17,9 +17,9 @@ const BlotterTab = () => (
 
 const tabs = [
   { id: 'portfolio', label: 'Portfolio', component: PortfolioBuilder },
-  { id: 'risk', label: 'Risk', component: VaRDashboard },
+  { id: 'risk', label: 'Risk', component: RiskWorkspace },
   { id: 'optimizer', label: 'Optimizer', component: EfficientFrontierChart },
-  { id: 'scenarios', label: 'Scenarios', component: ScenarioLabPhase4 },
+  { id: 'scenarios', label: 'Scenarios', component: ScenariosWorkspace },
   { id: 'blotter', label: 'Blotter', component: BlotterTab },
 ] as const;
 

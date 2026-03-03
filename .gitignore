@@ -1,6 +1,9 @@
 /target
 .vercel
 
+# Course knowledgebase (PDFs / notebooks — kept local only)
+knowledgebase/
+
 # Virtual Environment
 venv/
 env/

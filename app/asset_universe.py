@@ -123,7 +123,7 @@ def search_assets(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-YF_PERIODS = ("1d", "5d", "1mo", "3mo", "6mo", "1y", "ytd")
+YF_PERIODS = ("1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y", "ytd")
 
 
 @router.get("/history")
@@ -169,4 +169,140 @@ def get_asset_history(
         raise HTTPException(status_code=503, detail="History requires yfinance")
     except Exception as e:
         logger.exception("Asset history failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/quote/{symbol}")
+def get_asset_quote(symbol: str) -> dict:
+    """
+    Fetch current spot price, name, and currency for a symbol via yfinance.
+    """
+    try:
+        import yfinance as yf
+        ticker = yf.Ticker(symbol.strip().upper())
+        info = ticker.info or {}
+        spot = (
+            info.get("regularMarketPrice")
+            or info.get("currentPrice")
+            or info.get("previousClose")
+        )
+        if spot is None:
+            hist = ticker.history(period="1d")
+            spot = float(hist["Close"].iloc[-1]) if not hist.empty else None
+        if spot is None:
+            raise HTTPException(status_code=404, detail=f"No price found for {symbol}")
+        return {
+            "symbol": symbol.upper(),
+            "spot": float(spot),
+            "name": info.get("shortName", symbol),
+            "currency": info.get("currency", "USD"),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/options/{symbol}")
+def get_asset_options(
+    symbol: str,
+    n_expiries: int = Query(3, ge=1, le=6, description="Number of nearest expiries to include"),
+    moneyness_range: float = Query(0.20, ge=0.05, le=0.50, description="Strike range around ATM as fraction"),
+) -> dict:
+    """
+    Fetch real option chain data from yfinance for Heston calibration.
+    Returns call options (strike, expiry_years, mid_price, implied_vol) near ATM.
+    """
+    try:
+        import yfinance as yf
+        import math
+        from datetime import date as date_cls
+
+        ticker = yf.Ticker(symbol.strip().upper())
+
+        # Current spot price
+        info = ticker.info or {}
+        spot = (
+            info.get("regularMarketPrice")
+            or info.get("currentPrice")
+            or info.get("previousClose")
+        )
+        if spot is None:
+            hist = ticker.history(period="1d")
+            spot = float(hist["Close"].iloc[-1]) if not hist.empty else None
+        if spot is None:
+            raise HTTPException(status_code=404, detail=f"No spot price for {symbol}")
+        spot = float(spot)
+
+        # Available expiries
+        expirations = ticker.options
+        if not expirations:
+            raise HTTPException(status_code=404, detail=f"No options data for {symbol}")
+
+        today = date_cls.today()
+        options_out = []
+
+        for exp_str in expirations[:n_expiries]:
+            try:
+                exp_date = date_cls.fromisoformat(exp_str)
+                tau = (exp_date - today).days / 365.0
+                if tau <= 0.01:
+                    continue
+
+                chain = ticker.option_chain(exp_str)
+                calls = chain.calls
+
+                if calls is None or calls.empty:
+                    continue
+
+                # Filter strikes within moneyness_range of spot
+                lo = spot * (1 - moneyness_range)
+                hi = spot * (1 + moneyness_range)
+                calls = calls[(calls["strike"] >= lo) & (calls["strike"] <= hi)]
+
+                for _, row in calls.iterrows():
+                    strike = float(row["strike"])
+                    bid = float(row.get("bid", 0) or 0)
+                    ask = float(row.get("ask", 0) or 0)
+                    last = float(row.get("lastPrice", 0) or 0)
+                    iv = float(row.get("impliedVolatility", 0) or 0)
+
+                    # Use bid/ask mid if valid, else lastPrice
+                    if bid > 0 and ask > 0:
+                        mid = (bid + ask) / 2
+                    elif last > 0:
+                        mid = last
+                    else:
+                        continue
+
+                    if mid <= 0 or math.isnan(mid) or math.isnan(iv):
+                        continue
+
+                    options_out.append({
+                        "strike": round(strike, 2),
+                        "expiry": round(tau, 4),
+                        "expiry_str": exp_str,
+                        "price": round(mid, 4),
+                        "implied_vol": round(iv, 4),
+                        "moneyness": round(strike / spot, 4),
+                    })
+            except Exception:
+                continue
+
+        if not options_out:
+            raise HTTPException(status_code=404, detail=f"No valid options data found for {symbol}")
+
+        return {
+            "symbol": symbol.upper(),
+            "spot": spot,
+            "n_contracts": len(options_out),
+            "contracts": options_out,
+        }
+
+    except HTTPException:
+        raise
+    except ImportError:
+        raise HTTPException(status_code=503, detail="yfinance not installed")
+    except Exception as e:
+        logger.exception("Options fetch failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))

@@ -72,7 +72,7 @@ def kelly_multi_asset(
         constraints.append(w >= 0)
 
     prob = cp.Problem(objective, constraints)
-    prob.solve(solver=cp.ECOS, verbose=False)
+    prob.solve(verbose=False)
 
     if prob.status not in ["optimal", "optimal_inaccurate"]:
         raise ValueError(f"Kelly optimization failed: {prob.status}")

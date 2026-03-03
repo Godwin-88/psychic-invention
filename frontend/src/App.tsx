@@ -15,13 +15,11 @@ import { VolatilityWorkspace } from './components/Transact/workspaces/Volatility
 import { FactorWorkspace } from './components/Transact/workspaces/FactorWorkspace';
 import { ScenariosWorkspace } from './components/Transact/workspaces/ScenariosWorkspace';
 import { BlotterWorkspace } from './components/Transact/workspaces/BlotterWorkspace';
+import { MarketplaceItemPage } from './pages/MarketplaceItemPage';
 
-const MarketplacePage = () => (
-  <>
-    <LandingStage />
-    <MarketplaceStage />
-  </>
-);
+const LandingPage = () => <LandingStage />;
+
+const MarketplacePage = () => <MarketplaceStage />;
 
 function App() {
   return (
@@ -30,8 +28,9 @@ function App() {
       <div className="flex-1 flex flex-col">
         <Routes>
           {/* Landing + Marketplace */}
-          <Route path="/" element={<MarketplacePage />} />
+          <Route path="/" element={<LandingPage />} />
           <Route path="/marketplace" element={<MarketplacePage />} />
+          <Route path="/marketplace/:menuId" element={<MarketplaceItemPage />} />
 
           {/* Legacy routes (keep working) */}
           <Route path="/workspace" element={<PricingWorkspace />} />

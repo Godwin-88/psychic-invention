@@ -1,432 +1,366 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Button } from '@/components/Button';
-import { ExportButton } from '@/components/ExportButton';
-import { MarketDataDashboard } from '@/components/MarketDataDashboard';
-import { useBlackScholesPricing, useFFTPricing } from '@/hooks/useApi';
-import { useSelectedAssets } from '@/context/SelectedAssetsContext';
-import { getAssetHistory } from '@/utils/api';
-import type { OptionRequest, FFTRequest } from '@/types';
-import { computeCallGreeks } from '@/utils/greeks';
-import { 
-  exportBlackScholesCSV, 
-  exportBlackScholesJSON,
-  exportFFTSurfaceCSV,
-  exportFFTSurfaceJSON,
-  exportFFTCompleteJSON
-} from '@/utils/export';
+/**
+ * PricingWorkspace — Multi-Model Derivatives Pricer (Menu 1 · DPE)
+ *
+ * Live market data:
+ *   S ← getAssetQuote(symbol)               (spot price, live)
+ *   σ ← getAssetOptions(symbol) nearest ATM  (implied vol, live)
+ *
+ * Models (all priced in parallel):
+ *   Black-Scholes   POST /price/{call|put}/bs            analytical
+ *   FFT-Optimized   POST /price/{call|put}/fft-optimized  Carr-Madan auto-α
+ *   Heston SV       POST /price/{call|put}/heston         stochastic vol
+ *
+ * Model agreement: flag |FFT−BS|/BS > 1% or |Heston−BS|/BS > 5%
+ * Greeks: client-side BS (Δ, Γ, Θ, ν, ρ) — no extra request needed
+ */
+import { useState, useCallback, useMemo } from 'react';
+import { MathBlock, MathInline } from '@/components/ui/Math';
+import {
+  priceCallBS, pricePutBS,
+  priceCallFFTOpt, pricePutFFTOpt,
+  priceCallHeston, pricePutHeston,
+  getAssetQuote, getAssetOptions,
+} from '@/utils/api';
+import { computeCallGreeks, computePutGreeks } from '@/utils/greeks';
+import type { OptionRequest } from '@/types';
 
-const defaultOptionRequest: OptionRequest = {
-  s: 100,
-  k: 100,
-  tau: 1,
-  r: 0.05,
-  sigma: 0.2,
-};
+// ── Types ─────────────────────────────────────────────────────────────────────
+interface HestonParams { v0: number; kappa: number; theta: number; sigma_v: number; rho: number }
+interface ModelResult { call: number; put: number; label: string; tag: string; color: string }
 
-const defaultFFTState = {
-  s: 100,
-  k: 100,
-  tau: 1,
-  r: 0.05,
-  sigma: 0.2,
-  alpha: 1.5,
-  delta_v: 0.01,
-  n: 2048,
-};
+const DEFAULT_BS: OptionRequest   = { s: 100, k: 100, tau: 0.25, r: 0.05, sigma: 0.20 };
+const DEFAULT_H: HestonParams     = { v0: 0.04, kappa: 2.0, theta: 0.04, sigma_v: 0.30, rho: -0.70 };
 
-type FFTState = typeof defaultFFTState;
-type PricingWorkspaceProps = {
-  defaultTab?: 'bs' | 'fft';
-  showMarketData?: boolean;
-};
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const fellerOK = (h: HestonParams) => 2 * h.kappa * h.theta > h.sigma_v ** 2;
 
-export const PricingWorkspace = ({ defaultTab = 'bs' }: PricingWorkspaceProps) => {
-  const { selectedAssets } = useSelectedAssets();
-  const [tab, setTab] = useState<'bs' | 'fft'>(defaultTab);
-  const [optionRequest, setOptionRequest] = useState<OptionRequest>(defaultOptionRequest);
-  const [fftState, setFFTState] = useState<FFTState>(defaultFFTState);
+function pctDiff(a: number, b: number) { return Math.abs(a - b) / Math.max(Math.abs(a), 1e-8) * 100; }
 
-  const firstAssetSymbol = selectedAssets[0]?.symbol;
-  // Sync spot (s) with selected asset's current price from market data
-  useEffect(() => {
-    if (!firstAssetSymbol) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const history = await getAssetHistory(firstAssetSymbol, '5d');
-        if (cancelled || !Array.isArray(history) || history.length === 0) return;
-        const lastRow = history[history.length - 1];
-        const close = lastRow?.close;
-        if (typeof close === 'number' && close > 0) {
-          setOptionRequest((prev) => ({ ...prev, s: close }));
-          setFFTState((prev) => ({ ...prev, s: close }));
-        }
-      } catch {
-        // Ignore: keep current manual values
+const NUM_FLD: { key: keyof OptionRequest; label: string; step: number; min: number }[] = [
+  { key: 's',     label: 'S  (Spot)',      step: 0.01,  min: 0.01  },
+  { key: 'k',     label: 'K  (Strike)',    step: 0.01,  min: 0.01  },
+  { key: 'tau',   label: 'τ  (Years)',     step: 0.01,  min: 0.001 },
+  { key: 'r',     label: 'r  (Rate)',      step: 0.001, min: 0     },
+  { key: 'sigma', label: 'σ  (Vol)',       step: 0.01,  min: 0.01  },
+];
+
+const H_FLD: { key: keyof HestonParams; label: string; step: number; min: number; max?: number }[] = [
+  { key: 'v0',      label: 'v₀  (init var)',  step: 0.001, min: 0.001 },
+  { key: 'kappa',   label: 'κ  (mean rev)',   step: 0.1,   min: 0.01  },
+  { key: 'theta',   label: 'θ  (long var)',   step: 0.001, min: 0.001 },
+  { key: 'sigma_v', label: 'ξ  (vol-of-vol)', step: 0.01,  min: 0.01  },
+  { key: 'rho',     label: 'ρ  (corr)',       step: 0.01,  min: -0.99, max: 0.99 },
+];
+
+// ── Component ─────────────────────────────────────────────────────────────────
+export const PricingWorkspace = ({ defaultTab: _tab = 'bs' }: { defaultTab?: string }) => {
+  const [symbol,       setSymbol]       = useState('');
+  const [quoteInfo,    setQuoteInfo]    = useState<{ spot: number; name: string } | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
+
+  const [params,    setParams]    = useState<OptionRequest>(DEFAULT_BS);
+  const [heston,    setHeston]    = useState<HestonParams>(DEFAULT_H);
+  const [optType,   setOptType]   = useState<'call' | 'put'>('call');
+  const [showH,     setShowH]     = useState(false);
+
+  const [results,   setResults]   = useState<ModelResult[] | null>(null);
+  const [loading,   setLoading]   = useState(false);
+  const [error,     setError]     = useState<string | null>(null);
+
+  // ── Live asset fetch ────────────────────────────────────────────────────────
+  const loadAsset = useCallback(async (sym: string) => {
+    if (!sym) return;
+    setQuoteLoading(true);
+    setError(null);
+    try {
+      const [quote, opts] = await Promise.all([
+        getAssetQuote(sym),
+        getAssetOptions(sym, 2, 0.20).catch(() => null),
+      ]);
+      setQuoteInfo({ spot: quote.spot, name: quote.name });
+      const spot = quote.spot;
+      let iv = params.sigma;
+      if (opts?.contracts?.length) {
+        const atm = opts.contracts.reduce((b, c) =>
+          Math.abs(c.moneyness) < Math.abs(b.moneyness) ? c : b
+        );
+        if (atm.implied_vol > 0.01 && atm.implied_vol < 5) iv = Math.round(atm.implied_vol * 100) / 100;
       }
-    })();
-    return () => { cancelled = true; };
-  }, [firstAssetSymbol]);
+      setParams(prev => ({ ...prev, s: spot, k: Math.round(spot), sigma: iv }));
+      setHeston(prev => ({ ...prev, v0: Math.round(iv ** 2 * 1000) / 1000, theta: Math.round(iv ** 2 * 1000) / 1000 }));
+    } catch { setError(`Could not load quote for ${sym}. Check symbol.`); }
+    finally { setQuoteLoading(false); }
+  }, [params.sigma]);
 
-  const {
-    calculate: runBS,
-    loading: bsLoading,
-    error: bsError,
-    result: bsResult,
-  } = useBlackScholesPricing();
+  // ── Price all models ────────────────────────────────────────────────────────
+  const priceAll = useCallback(async () => {
+    if (params.s <= 0 || params.k <= 0 || params.tau <= 0 || params.sigma <= 0) {
+      setError('S, K, τ, σ must all be positive'); return;
+    }
+    setLoading(true); setError(null); setResults(null);
+    try {
+      const feller = fellerOK(heston);
+      const calls = [
+        priceCallBS(params),
+        pricePutBS(params),
+        priceCallFFTOpt(params),
+        pricePutFFTOpt(params),
+        feller ? priceCallHeston({ ...params, ...heston }) : Promise.resolve(null),
+        feller ? pricePutHeston({ ...params, ...heston })  : Promise.resolve(null),
+      ];
+      const [bsC, bsP, fftC, fftP, hC, hP] = await Promise.all(calls);
 
-  const {
-    calculate: runFFT,
-    loading: fftLoading,
-    error: fftError,
-    result: fftResult,
-  } = useFFTPricing();
+      const models: ModelResult[] = [
+        { call: (bsC as { price: number }).price,  put: (bsP as { price: number }).price,  label: 'Black-Scholes',      tag: 'Analytical · Closed-form',    color: 'blue'   },
+        { call: (fftC as { price: number }).price, put: (fftP as { price: number }).price, label: 'FFT (Carr-Madan)',    tag: 'Numerical · Auto-optimised',  color: 'violet' },
+      ];
+      if (hC && hP) {
+        models.push({ call: (hC as { price: number }).price, put: (hP as { price: number }).price, label: 'Heston SV', tag: 'Stochastic vol · 5-param', color: 'rose' });
+      } else if (!feller) {
+        setError(`Feller condition violated: 2κθ ≤ ξ² (${(2*heston.kappa*heston.theta).toFixed(4)} ≤ ${(heston.sigma_v**2).toFixed(4)}). Heston skipped.`);
+      }
+      setResults(models);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Pricing failed');
+    } finally { setLoading(false); }
+  }, [params, heston]);
 
-  useEffect(() => {
-    setTab(defaultTab);
-  }, [defaultTab]);
+  // ── Greeks (client-side BS) ─────────────────────────────────────────────────
+  const greeks = useMemo(() => {
+    if (params.s <= 0 || params.k <= 0 || params.tau <= 0 || params.sigma <= 0) return null;
+    return optType === 'call' ? computeCallGreeks(params) : computePutGreeks(params);
+  }, [params, optType]);
 
-  const greeks = useMemo(() => (bsResult ? computeCallGreeks(optionRequest) : null), [bsResult, optionRequest]);
-
-  const handleOptionChange = (field: keyof OptionRequest, value: string) => {
-    setOptionRequest(prev => ({
-      ...prev,
-      [field]: Number(value) || 0,
+  // ── Model agreement ─────────────────────────────────────────────────────────
+  const agreements = useMemo(() => {
+    if (!results || results.length < 2) return [];
+    const bs = results[0];
+    const ref = optType === 'call' ? bs.call : bs.put;
+    return results.slice(1).map(m => ({
+      label: m.label,
+      pct: pctDiff(ref, optType === 'call' ? m.call : m.put),
+      threshold: m.label.includes('Heston') ? 5 : 1,
     }));
-  };
+  }, [results, optType]);
 
-  const handleFFTChange = (field: keyof FFTState, value: string) => {
-    setFFTState(prev => ({
-      ...prev,
-      [field]: Number(value) || 0,
-    }));
-  };
-
-  const deltaK = useMemo(() => {
-    return (2 * Math.PI) / (fftState.n * fftState.delta_v);
-  }, [fftState.n, fftState.delta_v]);
-
-  const kMin = useMemo(() => {
-    return Math.log(fftState.k) - (fftState.n / 2) * deltaK;
-  }, [fftState.k, fftState.n, deltaK]);
-
-  const fftWindow = useMemo(() => {
-    if (!fftResult) return [];
-    const rows = fftResult.callSurface.map((call, idx) => {
-      const logStrike = fftResult.params.k_min + idx * fftResult.params.delta_k;
-      const strike = Math.exp(logStrike);
-      return {
-        strike,
-        call,
-        put: fftResult.putSurface[idx],
-      };
-    }).filter(row => Number.isFinite(row.call) && Number.isFinite(row.put));
-
-    if (!rows.length) return [];
-
-    const centerIndex = rows.findIndex(row => row.strike >= fftState.k);
-    const start = Math.max(0, (centerIndex === -1 ? rows.length - 5 : centerIndex - 2));
-    return rows.slice(start, start + 7);
-  }, [fftResult, fftState.k]);
-
-  const submitFFT = () => {
-    const payload: FFTRequest = {
-      ...fftState,
-      tau: fftState.tau,
-      k: fftState.k,
-      k_min: kMin,
-      delta_k: deltaK,
-    };
-    runFFT(payload);
-  };
-
-  const handleFFTSurfaceExportCSV = () => {
-    if (!fftWindow.length) return;
-    exportFFTSurfaceCSV(fftWindow);
-  };
-
-  const handleFFTSurfaceExportJSON = () => {
-    if (!fftWindow.length) return;
-    exportFFTSurfaceJSON(fftWindow);
-  };
-
-  const handleFFTCompleteExportJSON = () => {
-    if (!fftResult) return;
-    const payload: FFTRequest = {
-      ...fftState,
-      tau: fftState.tau,
-      k: fftState.k,
-      k_min: kMin,
-      delta_k: deltaK,
-    };
-    exportFFTCompleteJSON(payload, fftResult);
-  };
+  // ── Input helper ────────────────────────────────────────────────────────────
+  const inp = (
+    v: number, onChange: (n: number) => void,
+    step = 0.01, min = 0, max?: number
+  ) => (
+    <input type="number" value={v} step={step} min={min} max={max}
+      onChange={e => onChange(parseFloat(e.target.value) || 0)}
+      className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-1.5 text-white text-sm focus:border-blue-500 outline-none"
+    />
+  );
 
   return (
-    <section className="section-padding bg-slate-950 border-b border-slate-800">
-      <div className="container space-y-10">
-        <header className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
-          <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-400 mb-3 font-semibold">Interactive workspace</p>
-            <h2 className="text-3xl font-bold text-white mb-3">Take models live against the FastAPI backend</h2>
-            <p className="text-slate-300 max-w-3xl">
-              Choose a pricing model, set parameters, and route the request through the Rust bindings.
-              Results persist in the terminal window with contextual metrics for risk teams.
-            </p>
-          </div>
-          <div className="flex items-center gap-4 text-xs uppercase tracking-widest text-slate-400">
-            <span className="status-dot bg-success"></span>
-            <span>Direct to backend</span>
-          </div>
-        </header>
+    <div className="space-y-5">
 
-        <div className="bg-slate-900 rounded-2xl border border-slate-800">
-          <div className="flex flex-wrap border-b border-slate-800">
-            <button
-              className={`workspace-tab ${tab === 'bs' ? 'active' : ''}`}
-              onClick={() => setTab('bs')}
-            >
-              Analytical · Black-Scholes
-            </button>
-            <button
-              className={`workspace-tab ${tab === 'fft' ? 'active' : ''}`}
-              onClick={() => setTab('fft')}
-            >
-              Surface · Carr-Madan FFT
-            </button>
-          </div>
-
-          {tab === 'bs' && (
-            <div className="workspace-panel">
-              <div className="grid gap-8 lg:grid-cols-2">
-                <form className="space-y-6" onSubmit={(e) => { e.preventDefault(); runBS(optionRequest); }}>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    {(['s', 'k', 'tau', 'r', 'sigma'] as (keyof OptionRequest)[]).map(field => (
-                      <label key={field} className="text-sm">
-                        <span className="text-slate-400 block mb-2 uppercase tracking-widest">{field.toUpperCase()}</span>
-                        <input
-                          type="number"
-                          value={optionRequest[field]}
-                          onChange={(e) => handleOptionChange(field, e.target.value)}
-                          className="input-field"
-                          step="0.01"
-                        />
-                      </label>
-                    ))}
-                  </div>
-                  <Button type="submit" loading={bsLoading}>
-                    {bsLoading ? 'Pricing...' : 'Calculate Call & Put'}
-                  </Button>
-                  {bsError && <p className="text-danger text-sm font-mono">Error: {bsError}</p>}
-                </form>
-
-                <div className="space-y-6">
-                  {bsResult ? (
-                    <>
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-sm font-semibold text-slate-300">Results</h3>
-                        <ExportButton
-                          onExportCSV={() => exportBlackScholesCSV(optionRequest, bsResult, greeks)}
-                          onExportJSON={() => exportBlackScholesJSON(optionRequest, bsResult, greeks)}
-                        />
-                      </div>
-                      <div className="grid sm:grid-cols-2 gap-4">
-                        <div className="result-tile">
-                          <p className="text-xs uppercase tracking-widest text-slate-400">Call</p>
-                          <p className="text-3xl font-mono text-white">${bsResult.callPrice.toFixed(4)}</p>
-                        </div>
-                        <div className="result-tile">
-                          <p className="text-xs uppercase tracking-widest text-slate-400">Put</p>
-                          <p className="text-3xl font-mono text-white">${bsResult.putPrice.toFixed(4)}</p>
-                        </div>
-                      </div>
-                      <div className="grid sm:grid-cols-3 gap-4">
-                        <div className="metric-pill">
-                          <span className="text-xs text-slate-400">Model</span>
-                          <span className="font-semibold">{bsResult.model}</span>
-                        </div>
-                        <div className="metric-pill">
-                          <span className="text-xs text-slate-400">Latency</span>
-                          <span className="font-mono">{bsResult.responseTime} ms</span>
-                        </div>
-                        <div className="metric-pill">
-                          <span className="text-xs text-slate-400">Parity</span>
-                          <span className="font-mono text-success">S-Ke^(-rT)</span>
-                        </div>
-                      </div>
-                      {greeks && (
-                        <div className="bg-slate-950/40 p-4 rounded-xl border border-slate-800">
-                          <p className="text-xs uppercase tracking-widest text-slate-500 mb-3">Greeks (call)</p>
-                          <div className="grid sm:grid-cols-3 gap-3 text-sm font-mono">
-                            <span>Δ {greeks.delta.toFixed(3)}</span>
-                            <span>Γ {greeks.gamma.toExponential(2)}</span>
-                            <span>Θ {greeks.theta.toFixed(3)}</span>
-                            <span>ν {greeks.vega.toFixed(3)}</span>
-                            <span>ρ {greeks.rho.toFixed(3)}</span>
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <div className="empty-state">
-                      <p className="text-slate-400 font-mono">Awaiting calculation...</p>
-                      <p className="text-xs text-slate-500">Send a payload and results will render here.</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {tab === 'fft' && (
-            <div className="workspace-panel">
-              <div className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
-                <div>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    {(['s', 'k', 'tau', 'r', 'sigma'] as (keyof FFTState)[]).map(field => (
-                      <label key={field} className="text-sm">
-                        <span className="text-slate-400 block mb-2 uppercase tracking-widest">{field.toUpperCase()}</span>
-                        <input
-                          type="number"
-                          value={fftState[field]}
-                          onChange={(e) => handleFFTChange(field, e.target.value)}
-                          className="input-field"
-                          step="0.01"
-                        />
-                      </label>
-                    ))}
-                    <label className="text-sm">
-                      <span className="text-slate-400 block mb-2 uppercase tracking-widest">α (damping)</span>
-                      <input
-                        type="number"
-                        value={fftState.alpha}
-                        onChange={(e) => handleFFTChange('alpha', e.target.value)}
-                        className="input-field"
-                        step="0.1"
-                        min="0.5"
-                      />
-                    </label>
-                    <label className="text-sm">
-                      <span className="text-slate-400 block mb-2 uppercase tracking-widest">Δv (frequency)</span>
-                      <input
-                        type="number"
-                        value={fftState.delta_v}
-                        onChange={(e) => handleFFTChange('delta_v', e.target.value)}
-                        className="input-field"
-                        step="0.001"
-                        min="0.001"
-                      />
-                    </label>
-                    <label className="text-sm">
-                      <span className="text-slate-400 block mb-2 uppercase tracking-widest">Grid (n)</span>
-                      <select
-                        value={fftState.n}
-                        onChange={(e) => handleFFTChange('n', e.target.value)}
-                        className="input-field"
-                      >
-                        {[1024, 2048, 4096].map(val => (
-                          <option key={val} value={val}>{val}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="text-sm">
-                      <span className="text-slate-400 block mb-2 uppercase tracking-widest">Δk (derived)</span>
-                      <input
-                        value={deltaK.toExponential(3)}
-                        className="input-field bg-slate-800"
-                        disabled
-                      />
-                    </label>
-                    <label className="text-sm">
-                      <span className="text-slate-400 block mb-2 uppercase tracking-widest">kmin (derived)</span>
-                      <input
-                        value={kMin.toFixed(3)}
-                        className="input-field bg-slate-800"
-                        disabled
-                      />
-                    </label>
-                  </div>
-                  <Button className="mt-6" loading={fftLoading} onClick={submitFFT}>
-                    {fftLoading ? 'Generating surface...' : 'Generate FFT Surface'}
-                  </Button>
-                  {fftError && <p className="text-danger text-sm font-mono mt-3">Error: {fftError}</p>}
-                </div>
-
-                <div className="space-y-6">
-                  {fftResult ? (
-                    <>
-                      <div className="grid grid-cols-3 gap-3 text-xs text-slate-400">
-                        <div className="metric-pill">
-                          <span>Model</span>
-                          <span className="text-white">{fftResult.model}</span>
-                        </div>
-                        <div className="metric-pill">
-                          <span>Grid</span>
-                          <span className="text-white">{fftResult.params.n}</span>
-                        </div>
-                        <div className="metric-pill">
-                          <span>Δk</span>
-                          <span className="text-white">{fftResult.params.delta_k.toExponential(2)}</span>
-                        </div>
-                      </div>
-                      <div className="bg-slate-950/40 border border-slate-800 rounded-xl">
-                        <div className="flex items-center justify-between p-4 border-b border-slate-800">
-                          <div>
-                            <p className="text-xs uppercase tracking-widest text-slate-500">Option chain slice</p>
-                            <span className="text-slate-400 text-xs">Centered at K={fftState.k}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <ExportButton
-                              onExportCSV={handleFFTSurfaceExportCSV}
-                              onExportJSON={handleFFTSurfaceExportJSON}
-                              disabled={!fftWindow.length}
-                              className="mr-2"
-                            />
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={handleFFTCompleteExportJSON}
-                              disabled={!fftResult}
-                              className="text-xs"
-                            >
-                              Export Full Results
-                            </Button>
-                          </div>
-                        </div>
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-sm font-mono">
-                            <thead>
-                              <tr className="text-slate-400 text-xs uppercase tracking-widest">
-                                <th className="px-4 py-2 text-left">Strike</th>
-                                <th className="px-4 py-2 text-left">Call</th>
-                                <th className="px-4 py-2 text-left">Put</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {fftWindow.map((row) => (
-                                <tr key={row.strike} className="border-t border-slate-800">
-                                  <td className="px-4 py-2">${row.strike.toFixed(2)}</td>
-                                  <td className="px-4 py-2 text-primary-300">${row.call.toFixed(4)}</td>
-                                  <td className="px-4 py-2 text-gold">${row.put.toFixed(4)}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="empty-state">
-                      <p className="text-slate-400 font-mono">Generate an FFT grid to view surface data.</p>
-                      <p className="text-xs text-slate-500">We recommend n=2048, α=1.5 for stability.</p>
-                    </div>
-                  )}
-                </div>
-              </div>
+      {/* ── Live Asset Strip ─────────────────────────────────────────────── */}
+      <div className="rounded-xl border border-blue-800/40 bg-blue-900/5 p-4 space-y-3">
+        <p className="text-sm font-semibold text-slate-200">Live Asset</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <input
+            type="text" placeholder="Symbol (AAPL, TSLA, SPY, EURUSD…)"
+            value={symbol}
+            onChange={e => setSymbol(e.target.value.toUpperCase())}
+            onKeyDown={e => e.key === 'Enter' && loadAsset(symbol)}
+            className="flex-1 min-w-[200px] rounded-lg bg-slate-800 border border-slate-700 px-3 py-1.5 text-white text-sm focus:border-blue-500 outline-none"
+          />
+          <button onClick={() => loadAsset(symbol)} disabled={!symbol || quoteLoading}
+            className="px-4 py-1.5 rounded-lg bg-blue-700 hover:bg-blue-600 text-white text-sm font-medium disabled:opacity-40 transition">
+            {quoteLoading ? 'Loading…' : 'Load Quote'}
+          </button>
+          {quoteInfo && (
+            <div className="flex items-center gap-3 text-sm">
+              <span className="text-slate-400 truncate max-w-[180px]">{quoteInfo.name}</span>
+              <span className="font-mono text-blue-300 font-semibold">${quoteInfo.spot.toFixed(2)}</span>
+              <span className="text-xs text-slate-500">σ={params.sigma.toFixed(2)} (ATM IV)</span>
             </div>
           )}
         </div>
+        <p className="text-xs text-slate-600">Enter symbol → auto-fills S from live quote and σ from nearest ATM implied vol.</p>
       </div>
-    </section>
+
+      {/* ── Parameters Panel ─────────────────────────────────────────────── */}
+      <div className="rounded-xl border border-slate-700 bg-slate-900/50 p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-semibold text-slate-200">Option Parameters</p>
+          <div className="flex gap-1">
+            {(['call', 'put'] as const).map(t => (
+              <button key={t} onClick={() => setOptType(t)}
+                className={`px-3 py-1 rounded-lg text-xs font-medium transition capitalize ${optType === t ? (t === 'call' ? 'bg-blue-700 text-white' : 'bg-amber-700 text-white') : 'bg-slate-800 text-slate-400 hover:text-white border border-slate-700'}`}>
+                {t}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          {NUM_FLD.map(({ key, label, step, min }) => (
+            <div key={key}>
+              <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1">{label}</label>
+              {inp(params[key], v => setParams(p => ({ ...p, [key]: v })), step, min)}
+            </div>
+          ))}
+        </div>
+
+        {/* Heston params */}
+        <button onClick={() => setShowH(v => !v)}
+          className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 transition">
+          <span>{showH ? '▾' : '▸'}</span>
+          <span>Heston Parameters (v₀, κ, θ, ξ, ρ)</span>
+          {!fellerOK(heston) && (
+            <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] bg-amber-900/40 text-amber-400 border border-amber-700/40">
+              ⚠ Feller: 2κθ &lt; ξ²
+            </span>
+          )}
+        </button>
+
+        {showH && (
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-3 border-t border-slate-800">
+            {H_FLD.map(({ key, label, step, min, max }) => (
+              <div key={key}>
+                <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1">{label}</label>
+                {inp(heston[key], v => setHeston(h => ({ ...h, [key]: v })), step, min, max)}
+              </div>
+            ))}
+          </div>
+        )}
+
+        <button onClick={priceAll} disabled={loading}
+          className="w-full py-2.5 rounded-lg bg-blue-700 hover:bg-blue-600 text-white font-semibold text-sm disabled:opacity-40 transition flex items-center justify-center gap-2">
+          {loading && (
+            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+            </svg>
+          )}
+          {loading ? 'Pricing all models…' : 'Price All Models  ·  BS  ·  FFT  ·  Heston'}
+        </button>
+        {error && <p className="text-red-400 text-xs mt-1">{error}</p>}
+      </div>
+
+      {/* ── Model Result Cards ────────────────────────────────────────────── */}
+      {results && (
+        <div className={`grid gap-4 ${results.length === 3 ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
+          {results.map(m => {
+            const price = optType === 'call' ? m.call : m.put;
+            const other = optType === 'call' ? m.put  : m.call;
+            const parity = params.s - params.k * Math.exp(-params.r * params.tau);
+            return (
+              <div key={m.label}
+                className={`rounded-xl border border-${m.color}-800/40 bg-${m.color}-900/5 p-4 space-y-3`}>
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-sm font-semibold text-slate-200">{m.label}</p>
+                  <span className={`text-[10px] text-${m.color}-300 border border-${m.color}-700/40 rounded px-1.5 py-0.5 whitespace-nowrap`}>
+                    {m.tag}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-[10px] text-slate-500 uppercase tracking-wider">Call</p>
+                    <p className="text-2xl font-mono text-white">${m.call.toFixed(4)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-slate-500 uppercase tracking-wider">Put</p>
+                    <p className="text-2xl font-mono text-white">${m.put.toFixed(4)}</p>
+                  </div>
+                </div>
+                <div className="pt-2 border-t border-slate-800 space-y-1 text-[11px]">
+                  <p className="text-slate-500">
+                    {optType === 'call' ? 'Put' : 'Call'} price: <span className="font-mono text-slate-300">${other.toFixed(4)}</span>
+                  </p>
+                  <p className="text-slate-500">
+                    Parity C−P: <span className="font-mono text-slate-300">{(m.call - m.put).toFixed(4)}</span>
+                    {' '}vs S−Ke⁻ʳᵗ: <span className="font-mono text-slate-300">{parity.toFixed(4)}</span>
+                    {' '}<span className={Math.abs(m.call - m.put - parity) < 0.01 ? 'text-green-400' : 'text-amber-400'}>
+                      {Math.abs(m.call - m.put - parity) < 0.01 ? '✓' : '≈'}
+                    </span>
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ── Model Agreement ──────────────────────────────────────────────── */}
+      {results && agreements.length > 0 && (
+        <div className="rounded-xl border border-slate-700 bg-slate-900/50 p-4">
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
+            Model Agreement  vs  Black-Scholes
+          </p>
+          <div className="flex flex-wrap gap-5">
+            {agreements.map(a => (
+              <div key={a.label} className="flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full ${a.pct < a.threshold ? 'bg-green-500' : 'bg-amber-500'}`} />
+                <span className="text-sm text-slate-300">
+                  {a.label} deviation:
+                  <span className={`font-mono ml-1 ${a.pct < a.threshold ? 'text-green-400' : 'text-amber-400'}`}>
+                    {a.pct.toFixed(3)}%
+                  </span>
+                  <span className="ml-1 text-slate-500 text-xs">
+                    {a.pct < a.threshold ? '✓ agree' : `⚠ >${a.threshold}%`}
+                  </span>
+                </span>
+              </div>
+            ))}
+          </div>
+          <p className="text-[10px] text-slate-600 mt-2">
+            Thresholds: FFT vs BS &lt;1% | Heston vs BS &lt;5% (vol-smile skew expected for Heston)
+          </p>
+        </div>
+      )}
+
+      {/* ── Greeks (BS · client-side) ─────────────────────────────────────── */}
+      {greeks && (
+        <div className="rounded-xl border border-slate-700 bg-slate-900/50 p-4">
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
+            Greeks  ·  BS {optType}  ·  S={params.s}  K={params.k}  τ={params.tau}  σ={params.sigma}
+          </p>
+          <div className="grid grid-cols-5 gap-3 text-center">
+            {([
+              ['Δ  Delta',  greeks.delta,  'text-blue-400'],
+              ['Γ  Gamma',  greeks.gamma,  'text-violet-400'],
+              ['Θ  Theta',  greeks.theta,  'text-amber-400'],
+              ['ν  Vega',   greeks.vega,   'text-green-400'],
+              ['ρ  Rho',    greeks.rho,    'text-rose-400'],
+            ] as [string, number, string][]).map(([lbl, val, cls]) => (
+              <div key={lbl} className="rounded-lg bg-slate-800/50 border border-slate-700 p-2">
+                <p className="text-[10px] text-slate-500 mb-1">{lbl}</p>
+                <p className={`font-mono text-sm ${cls}`}>{val.toFixed(4)}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 px-3 py-2.5 rounded-lg bg-slate-900/50 border border-slate-800 overflow-x-auto">
+            <MathBlock latex="\Delta = N(d_1) \quad \Gamma = \frac{N'(d_1)}{S\sigma\sqrt{\tau}} \quad \nu = S\phi(d_1)\sqrt{\tau} \quad \Theta = -\frac{S\sigma\phi(d_1)}{2\sqrt{\tau}} - rKe^{-r\tau}N(d_2)" />
+          </div>
+        </div>
+      )}
+
+      {/* ── Theory Box ───────────────────────────────────────────────────── */}
+      <div className="rounded-xl border border-slate-800 bg-slate-900/30 p-5 space-y-4">
+        <p className="text-xs uppercase tracking-widest text-slate-500 font-semibold">DPE Pricing Models</p>
+
+        <div className="space-y-3">
+          <div className="rounded-lg bg-blue-500/5 border border-blue-500/20 px-4 py-3 overflow-x-auto">
+            <p className="text-[10px] text-blue-400 uppercase tracking-widest font-semibold mb-2">Black-Scholes</p>
+            <MathBlock latex="C = S N(d_1) - K e^{-r\tau} N(d_2), \quad d_1 = \frac{\ln(S/K)+\left(r+\frac{1}{2}\sigma^2\right)\tau}{\sigma\sqrt{\tau}}" />
+          </div>
+
+          <div className="rounded-lg bg-violet-500/5 border border-violet-500/20 px-4 py-3 overflow-x-auto">
+            <p className="text-[10px] text-violet-400 uppercase tracking-widest font-semibold mb-2">FFT Carr-Madan</p>
+            <MathBlock latex="C(k) = \frac{e^{-r\tau}}{\pi}\,\mathrm{Re}\!\left[\int_0^\infty e^{-iuk}\,\psi(u)\,du\right] \quad \text{auto-optimised } \alpha, N, \Delta v" />
+          </div>
+
+          <div className="rounded-lg bg-rose-500/5 border border-rose-500/20 px-4 py-3 overflow-x-auto">
+            <p className="text-[10px] text-rose-400 uppercase tracking-widest font-semibold mb-2">Heston Stochastic Volatility</p>
+            <MathBlock latex="dv = \kappa(\theta-v)\,dt + \xi\sqrt{v}\,dW_2, \quad 2\kappa\theta > \xi^2 \;\text{(Feller)}" />
+          </div>
+        </div>
+      </div>
+    </div>
   );
 };

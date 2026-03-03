@@ -87,7 +87,7 @@ def risk_parity_rrp(
     constraints = [cp.sum(w) == 1, w >= 0] if long_only else [cp.sum(w) == 1]
 
     prob = cp.Problem(objective, constraints)
-    prob.solve(solver=cp.ECOS, verbose=False)
+    prob.solve(verbose=False)
 
     if prob.status not in ["optimal", "optimal_inaccurate"]:
         return risk_parity_erc(cov)

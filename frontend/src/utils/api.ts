@@ -49,6 +49,26 @@ export const pricePutFFT = async (request: FFTRequest): Promise<FFTResponse> => 
   return response.data;
 };
 
+// FFT-Optimized pricing (auto α, n, Δv)
+export const priceCallFFTOpt = async (data: { s: number; k: number; tau: number; r: number; sigma: number }) => {
+  const response = await apiClient.post(API_CONFIG.ENDPOINTS.PRICE_CALL_FFT_OPT, data);
+  return response.data as { price: number; model: string };
+};
+export const pricePutFFTOpt = async (data: { s: number; k: number; tau: number; r: number; sigma: number }) => {
+  const response = await apiClient.post(API_CONFIG.ENDPOINTS.PRICE_PUT_FFT_OPT, data);
+  return response.data as { price: number; model: string };
+};
+
+// Heston stochastic-vol pricing
+export const priceCallHeston = async (data: { s: number; k: number; tau: number; r: number; v0: number; theta: number; kappa: number; sigma_v: number; rho: number }) => {
+  const response = await apiClient.post(API_CONFIG.ENDPOINTS.PRICE_CALL_HESTON, data);
+  return response.data as { price: number; model: string };
+};
+export const pricePutHeston = async (data: { s: number; k: number; tau: number; r: number; v0: number; theta: number; kappa: number; sigma_v: number; rho: number }) => {
+  const response = await apiClient.post(API_CONFIG.ENDPOINTS.PRICE_PUT_HESTON, data);
+  return response.data as { price: number; model: string };
+};
+
 // Greeks (BS, FFT, numerical)
 export const postGreeksCall = async (data: { s: number; k: number; tau: number; r: number; sigma: number; model?: string }) => {
   const response = await apiClient.post(API_CONFIG.ENDPOINTS.GREEKS_CALL, {
@@ -110,6 +130,36 @@ export const getAssetHistory = async (
 ): Promise<{ date: string; open: number | null; high: number | null; low: number | null; close: number | null; volume: number | null }[]> => {
   const response = await apiClient.get(API_CONFIG.ENDPOINTS.ASSETS_HISTORY, {
     params: { symbol, period },
+  });
+  return response.data;
+};
+
+export const getAssetQuote = async (
+  symbol: string
+): Promise<{ symbol: string; spot: number; name: string; currency: string }> => {
+  const response = await apiClient.get(`${API_CONFIG.ENDPOINTS.ASSETS_QUOTE}/${symbol}`);
+  return response.data;
+};
+
+export const getAssetOptions = async (
+  symbol: string,
+  nExpiries: number = 3,
+  moneynessRange: number = 0.20,
+): Promise<{
+  symbol: string;
+  spot: number;
+  n_contracts: number;
+  contracts: {
+    strike: number;
+    expiry: number;
+    expiry_str: string;
+    price: number;
+    implied_vol: number;
+    moneyness: number;
+  }[];
+}> => {
+  const response = await apiClient.get(`${API_CONFIG.ENDPOINTS.ASSETS_OPTIONS}/${symbol}`, {
+    params: { n_expiries: nExpiries, moneyness_range: moneynessRange },
   });
   return response.data;
 };
@@ -221,6 +271,33 @@ export const postOptimizeKellySingle = async (data: { p: number; q: number; a?: 
 };
 
 // Phase 3
+export const postRiskCovarianceHealth = async (data: { returns: number[][] }) => {
+  const response = await apiClient.post(API_CONFIG.ENDPOINTS.RISK_COVARIANCE_HEALTH, data);
+  return response.data;
+};
+
+export const postRiskMst = async (data: { returns: number[][]; labels?: string[] }) => {
+  const response = await apiClient.post(API_CONFIG.ENDPOINTS.RISK_MST, data);
+  return response.data;
+};
+
+export const postRiskGreeksAggregate = async (data: {
+  positions: {
+    asset: string;
+    delta: number;
+    gamma: number;
+    vega: number;
+    theta: number;
+    quantity: number;
+    spot_price: number;
+  }[];
+  alpha?: number;
+  sigma_spot?: number;
+}) => {
+  const response = await apiClient.post(API_CONFIG.ENDPOINTS.RISK_GREEKS_AGGREGATE, data);
+  return response.data;
+};
+
 export const postFactorsEstimate = async (data: { returns: number[][]; factors: number[][] }) => {
   const response = await apiClient.post(API_CONFIG.ENDPOINTS.FACTORS_ESTIMATE, data);
   return response.data;
@@ -233,6 +310,18 @@ export const postPortfolioCoskewness = async (data: { returns: number[][]; weigh
   const response = await apiClient.post(API_CONFIG.ENDPOINTS.PORTFOLIO_COSKEWNESS, data);
   return response.data;
 };
+
+export const postPortfolioAttribution = async (data: {
+  portfolio_returns: number[];
+  market_returns: number[];
+  risk_free_rate?: number;
+  factor_betas?: number[];
+  factor_returns?: number[][];
+  factor_names?: string[];
+}) => {
+  const response = await apiClient.post(API_CONFIG.ENDPOINTS.PORTFOLIO_ATTRIBUTION, data);
+  return response.data;
+};
 export const postHestonCalibrate = async (data: { s: number; r: number; strikes: number[]; expiries: number[]; market_prices: number[] }) => {
   const response = await apiClient.post(API_CONFIG.ENDPOINTS.HESTON_CALIBRATE, data);
   return response.data;
@@ -241,12 +330,31 @@ export const postVolImpliedSurface = async (data: { s: number; r: number; strike
   const response = await apiClient.post(API_CONFIG.ENDPOINTS.VOL_IMPLIED_SURFACE, data);
   return response.data;
 };
+export const postVolHestonSurface = async (data: {
+  v0?: number; kappa?: number; theta?: number; xi?: number; rho?: number;
+  s?: number; r?: number; n_moneyness?: number; n_expiry?: number;
+}) => {
+  const response = await apiClient.post(API_CONFIG.ENDPOINTS.VOL_HESTON_SURFACE, data);
+  return response.data;
+};
+export const postVolHistorical = async (data: { returns: number[]; window?: number; annualise?: boolean }) => {
+  const response = await apiClient.post(API_CONFIG.ENDPOINTS.VOL_HISTORICAL, data);
+  return response.data;
+};
+export const postVolFactorDecompose = async (data: { returns: number[][]; weights: number[]; market_returns?: number[] }) => {
+  const response = await apiClient.post(API_CONFIG.ENDPOINTS.VOL_FACTOR_DECOMPOSE, data);
+  return response.data;
+};
 export const postFactorsSmartBeta = async (data: { factor_scores: number[]; returns: number[][]; method?: string }) => {
   const response = await apiClient.post(API_CONFIG.ENDPOINTS.FACTORS_SMART_BETA, data);
   return response.data;
 };
 export const postFactorsCrowding = async (data: { factor_loadings: number[][] }) => {
   const response = await apiClient.post(API_CONFIG.ENDPOINTS.FACTORS_CROWDING, data);
+  return response.data;
+};
+export const postFactorsPca = async (data: { returns: number[][]; n_components?: number }) => {
+  const response = await apiClient.post(API_CONFIG.ENDPOINTS.FACTORS_PCA, data);
   return response.data;
 };
 

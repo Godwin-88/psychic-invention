@@ -7,6 +7,10 @@ export const API_CONFIG = {
     PRICE_PUT_BS: '/price/put/bs',
     PRICE_CALL_FFT: '/price/call/fft',
     PRICE_PUT_FFT: '/price/put/fft',
+    PRICE_CALL_FFT_OPT: '/price/call/fft-optimized',
+    PRICE_PUT_FFT_OPT: '/price/put/fft-optimized',
+    PRICE_CALL_HESTON: '/price/call/heston',
+    PRICE_PUT_HESTON: '/price/put/heston',
     GREEKS_CALL: '/greeks/call',
     GREEKS_PUT: '/greeks/put',
     // Market Data endpoints
@@ -36,10 +40,18 @@ export const API_CONFIG = {
     FACTORS_ESTIMATE: '/factors/estimate',
     FACTORS_FAMA_MACBETH: '/factors/fama-macbeth',
     PORTFOLIO_COSKEWNESS: '/portfolio/coskewness',
+    PORTFOLIO_ATTRIBUTION: '/portfolio/attribution',
+    RISK_COVARIANCE_HEALTH: '/risk/covariance-health',
+    RISK_MST: '/risk/mst',
+    RISK_GREEKS_AGGREGATE: '/risk/greeks-aggregate',
     HESTON_CALIBRATE: '/heston/calibrate',
     VOL_IMPLIED_SURFACE: '/vol/implied-surface',
+    VOL_HESTON_SURFACE: '/vol/heston-surface',
+    VOL_HISTORICAL: '/vol/historical',
+    VOL_FACTOR_DECOMPOSE: '/vol/factor-decompose',
     FACTORS_SMART_BETA: '/factors/smart-beta',
     FACTORS_CROWDING: '/factors/crowding',
+    FACTORS_PCA: '/factors/pca',
     // Phase 4: Scenarios & Behavioral
     SCENARIOS_DEFINE: '/scenarios/define',
     SCENARIOS_RUN: '/scenarios/run',
@@ -52,8 +64,10 @@ export const API_CONFIG = {
     ASSETS_TYPES: '/assets/types',
     ASSETS_SEARCH: '/assets/search',
     ASSETS_HISTORY: '/assets/history',
+    ASSETS_QUOTE: '/assets/quote',
+    ASSETS_OPTIONS: '/assets/options',
   },
-  TIMEOUT: 10000,
+  TIMEOUT: 30000,
 } as const;
 
 export const DEMO_CONFIG = {

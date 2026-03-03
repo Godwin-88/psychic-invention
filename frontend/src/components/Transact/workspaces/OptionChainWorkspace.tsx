@@ -1,149 +1,250 @@
-import { useState, useMemo, useEffect } from 'react';
-import { Button } from '@/components/Button';
-import { OptionChainDisplay } from '@/components/OptionChainDisplay';
-import { useOptionChain, useSupportedSymbols } from '@/hooks/useApi';
-import { useSelectedAssets } from '@/context/SelectedAssetsContext';
-import type { OptionChainData, OptionContractResponse } from '@/types';
+/**
+ * OptionChainWorkspace — Live option chain from yfinance (Menu 1.3)
+ *
+ * Data: getAssetOptions(symbol, nExpiries, moneynessRange)
+ *   → contracts: { strike, expiry_str, price, implied_vol, moneyness }
+ *
+ * Displays per expiry group:
+ *   Strike | Moneyness | Mkt Price | Implied Vol | BS Theoretical | Δ (BS)
+ *
+ * ITM = green  (moneyness < −0.02 for puts / > +0.02 for calls)
+ * ATM = yellow (|moneyness| ≤ 0.02)
+ * OTM = dim    (moneyness > +0.02 for calls / < −0.02 for puts)
+ */
+import { useState, useMemo, useCallback } from 'react';
+import { getAssetOptions, getAssetQuote } from '@/utils/api';
+import { computeCallGreeks } from '@/utils/greeks';
 
-function toOptionChainData(
-  calls: OptionContractResponse[],
-  puts: OptionContractResponse[],
-  expiryStr: string
-): OptionChainData[] {
-  const byStrike = new Map<number, { call?: OptionContractResponse; put?: OptionContractResponse }>();
-  calls.forEach((c) => {
-    const e = byStrike.get(c.strike) ?? {};
-    e.call = c;
-    byStrike.set(c.strike, e);
-  });
-  puts.forEach((p) => {
-    const e = byStrike.get(p.strike) ?? {};
-    e.put = p;
-    byStrike.set(p.strike, e);
-  });
-  return Array.from(byStrike.entries())
-    .map(([strike, { call, put }]) => {
-      const mid = (v: number, w: number) => ((v ?? 0) + (w ?? 0)) / 2;
-      const callPrice = call ? mid(call.bid, call.ask) : 0;
-      const putPrice = put ? mid(put.bid, put.ask) : 0;
-      const callGreeks = call && (call.delta != null)
-        ? { delta: call.delta, gamma: call.gamma ?? 0, theta: call.theta ?? 0, vega: call.vega ?? 0, rho: call.rho ?? 0 }
-        : undefined;
-      const putGreeks = put && (put.delta != null)
-        ? { delta: put.delta, gamma: put.gamma ?? 0, theta: put.theta ?? 0, vega: put.vega ?? 0, rho: put.rho ?? 0 }
-        : undefined;
-      return {
-        strike,
-        expiration: expiryStr,
-        callPrice,
-        putPrice,
-        callImpliedVol: call?.implied_volatility,
-        putImpliedVol: put?.implied_volatility,
-        callGreeks,
-        putGreeks,
-      };
-    })
-    .sort((a, b) => a.strike - b.strike);
+// ── BS pricing (client-side) ──────────────────────────────────────────────────
+const INV_SQRT2PI = 1 / Math.sqrt(2 * Math.PI);
+function erf(x: number) {
+  const sign = Math.sign(x) || 1;
+  const t = 1 / (1 + 0.3275911 * Math.abs(x));
+  const poly = t * (0.254829592 + t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429))));
+  return sign * (1 - poly * Math.exp(-x * x));
+}
+function normCDF(x: number) { return (1 + erf(x / Math.SQRT2)) / 2; }
+
+function bsCall(s: number, k: number, tau: number, r: number, sigma: number): number {
+  if (tau <= 0 || sigma <= 0) return Math.max(0, s - k);
+  const d1 = (Math.log(s / k) + (r + 0.5 * sigma * sigma) * tau) / (sigma * Math.sqrt(tau));
+  const d2 = d1 - sigma * Math.sqrt(tau);
+  return s * normCDF(d1) - k * Math.exp(-r * tau) * normCDF(d2);
 }
 
+function bsPut(s: number, k: number, tau: number, r: number, sigma: number): number {
+  const call = bsCall(s, k, tau, r, sigma);
+  return call - s + k * Math.exp(-r * tau);
+}
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+interface Contract {
+  strike: number;
+  expiry_str: string;
+  price: number;
+  implied_vol: number;
+  moneyness: number;
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function tauFromExpiry(expiryStr: string): number {
+  const exp = new Date(expiryStr).getTime();
+  const now = Date.now();
+  return Math.max(0.001, (exp - now) / (365.25 * 24 * 3600 * 1000));
+}
+
+function moneynessLabel(m: number): { label: string; cls: string } {
+  if (Math.abs(m) <= 0.02) return { label: 'ATM', cls: 'text-yellow-300' };
+  if (m > 0.02)             return { label: 'OTM', cls: 'text-slate-500' };
+  return                           { label: 'ITM', cls: 'text-green-400' };
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
 export const OptionChainWorkspace = () => {
-  const { selectedAssets } = useSelectedAssets();
-  const { data: supportedSymbols } = useSupportedSymbols();
-  const { fetchOptionChain, loading, error, data } = useOptionChain();
+  const [symbol,    setSymbol]    = useState('AAPL');
+  const [nExpiries, setNExpiries] = useState(3);
+  const [mRange,    setMRange]    = useState(0.25);
+  const [rfRate,    setRfRate]    = useState(0.05);
+  const [optType,   setOptType]   = useState<'call' | 'put'>('call');
+  const [loading,   setLoading]   = useState(false);
+  const [error,     setError]     = useState<string | null>(null);
+  const [data,      setData]      = useState<{ spot: number; contracts: Contract[] } | null>(null);
 
-  const defaultSymbol = selectedAssets[0]?.symbol ?? 'AAPL';
-  const [underlying, setUnderlying] = useState(defaultSymbol);
+  const fetchChain = useCallback(async () => {
+    if (!symbol) return;
+    setLoading(true); setError(null); setData(null);
+    try {
+      const [opts, quote] = await Promise.all([
+        getAssetOptions(symbol, nExpiries, mRange),
+        getAssetQuote(symbol).catch(() => null),
+      ]);
+      const spot = quote?.spot ?? opts.spot;
+      setData({ spot, contracts: opts.contracts });
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to fetch option chain');
+    } finally { setLoading(false); }
+  }, [symbol, nExpiries, mRange]);
 
-  useEffect(() => {
-    if (selectedAssets[0]?.symbol) setUnderlying(selectedAssets[0].symbol);
-  }, [selectedAssets[0]?.symbol]);
-
-  const [expiry, setExpiry] = useState(() => {
-    const d = new Date();
-    d.setMonth(d.getMonth() + 1);
-    return d.toISOString().slice(0, 10);
-  });
-
-  const symbols = useMemo(() => {
-    const stocks = supportedSymbols?.symbols?.stocks ?? [];
-    const selected = selectedAssets.map((a) => a.symbol).filter((s) => !stocks.includes(s));
-    return [...new Set([...stocks, ...selected])];
-  }, [supportedSymbols, selectedAssets]);
-
-  const chainData = useMemo(() => {
+  // Group contracts by expiry_str
+  const grouped = useMemo(() => {
     if (!data) return [];
-    const expiryStr = typeof data.expiry === 'string'
-      ? data.expiry.slice(0, 10)
-      : new Date(data.expiry).toISOString().slice(0, 10);
-    return toOptionChainData(data.calls ?? [], data.puts ?? [], expiryStr);
+    const map = new Map<string, Contract[]>();
+    for (const c of data.contracts) {
+      const list = map.get(c.expiry_str) ?? [];
+      list.push(c);
+      map.set(c.expiry_str, list);
+    }
+    return Array.from(map.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([exp, contracts]) => ({
+        exp,
+        tau: tauFromExpiry(exp),
+        contracts: contracts.sort((a, b) => a.strike - b.strike),
+      }));
   }, [data]);
 
-  const handleFetch = () => {
-    fetchOptionChain({ underlying, expiry });
-  };
-
-  const spotPrice = data ? undefined : undefined; // Could fetch from getMarketData if needed
+  const spot = data?.spot ?? 0;
 
   return (
-    <div className="space-y-6">
-      <div className="rounded-xl border border-slate-700 bg-slate-900/50 p-6">
-        <h3 className="text-lg font-semibold text-white mb-4">Option Chain</h3>
-        <p className="text-sm text-slate-400 mb-4">
-          Fetch live option chain for an underlying. Requires Deriv API connection for real-time data.
-        </p>
+    <div className="space-y-5">
+      {/* Controls */}
+      <div className="rounded-xl border border-slate-700 bg-slate-900/50 p-5 space-y-4">
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="text-sm font-semibold text-slate-200 mr-2">Option Chain</p>
+          <span className="text-[10px] px-2 py-0.5 rounded-full border border-slate-600 text-slate-400 uppercase tracking-wider">yfinance · live</span>
+        </div>
 
-        <div className="flex flex-wrap items-end gap-4 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div className="sm:col-span-1">
+            <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1">Symbol</label>
+            <input type="text" value={symbol} onChange={e => setSymbol(e.target.value.toUpperCase())}
+              onKeyDown={e => e.key === 'Enter' && fetchChain()}
+              className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-1.5 text-white text-sm focus:border-blue-500 outline-none" />
+          </div>
           <div>
-            <label className="block text-sm text-slate-400 mb-1">Underlying</label>
-            <select
-              value={underlying}
-              onChange={(e) => setUnderlying(e.target.value)}
-              className="rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white text-sm min-w-[120px]"
-              aria-label="Underlying symbol"
-            >
-              {symbols.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-              {symbols.length === 0 && (
-                <option value={defaultSymbol}>{defaultSymbol}</option>
-              )}
+            <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1">Expiries (n)</label>
+            <select value={nExpiries} onChange={e => setNExpiries(Number(e.target.value))}
+              className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-1.5 text-white text-sm">
+              {[2, 3, 4, 5].map(n => <option key={n} value={n}>{n}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-sm text-slate-400 mb-1">Expiry</label>
-            <input
-              type="date"
-              value={expiry}
-              onChange={(e) => setExpiry(e.target.value)}
-              className="rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white text-sm"
-              aria-label="Expiration date"
-            />
+            <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1">Moneyness ±</label>
+            <select value={mRange} onChange={e => setMRange(Number(e.target.value))}
+              className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-1.5 text-white text-sm">
+              {[0.10, 0.15, 0.20, 0.25, 0.30].map(v => <option key={v} value={v}>{(v * 100).toFixed(0)}%</option>)}
+            </select>
           </div>
-          <Button onClick={handleFetch} loading={loading} disabled={!underlying || !expiry}>
-            Fetch Chain
-          </Button>
+          <div>
+            <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1">r_f</label>
+            <input type="number" value={rfRate} step={0.005} min={0} max={0.3}
+              onChange={e => setRfRate(parseFloat(e.target.value) || 0)}
+              className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-1.5 text-white text-sm" />
+          </div>
+          <div>
+            <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1">Type</label>
+            <select value={optType} onChange={e => setOptType(e.target.value as 'call' | 'put')}
+              className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-1.5 text-white text-sm">
+              <option value="call">Call</option>
+              <option value="put">Put</option>
+            </select>
+          </div>
         </div>
 
-        {error && (
-          <div className="rounded-lg border border-red-800 bg-red-900/20 p-4 text-red-300 text-sm mb-4">
-            {error}
-          </div>
-        )}
+        <button onClick={fetchChain} disabled={loading || !symbol}
+          className="px-5 py-2 rounded-lg bg-blue-700 hover:bg-blue-600 text-white text-sm font-medium disabled:opacity-40 transition flex items-center gap-2">
+          {loading && (
+            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+            </svg>
+          )}
+          {loading ? 'Fetching…' : 'Fetch Live Chain'}
+        </button>
 
-        {chainData.length > 0 ? (
-          <OptionChainDisplay
-            data={chainData}
-            currentSpotPrice={spotPrice}
-            showGreeks={true}
-            showImpliedVol={true}
-          />
-        ) : !loading && (
-          <div className="rounded-lg border border-slate-700 bg-slate-800/30 p-8 text-center">
-            <p className="text-slate-400">Select underlying and expiry, then click Fetch Chain</p>
-            <p className="text-slate-500 text-xs mt-1">Market data may be limited for some symbols</p>
-          </div>
-        )}
+        {error && <p className="text-red-400 text-xs">{error}</p>}
       </div>
+
+      {/* Chain tables grouped by expiry */}
+      {grouped.length > 0 && (
+        <div className="space-y-5">
+          {/* Summary */}
+          <div className="flex items-center gap-4 text-xs text-slate-400">
+            <span>{symbol}</span>
+            <span className="font-mono text-blue-300">S = ${spot.toFixed(2)}</span>
+            <span>{grouped.length} expiries · {data?.contracts.length} contracts</span>
+            <span className="flex gap-2">
+              <span className="text-green-400">■ ITM</span>
+              <span className="text-yellow-300">■ ATM</span>
+              <span className="text-slate-500">■ OTM</span>
+            </span>
+          </div>
+
+          {grouped.map(({ exp, tau, contracts }) => (
+            <div key={exp} className="rounded-xl border border-slate-700 bg-slate-900/50 overflow-hidden">
+              <div className="px-4 py-2 bg-slate-800/50 border-b border-slate-700 flex items-center gap-3">
+                <p className="text-sm font-semibold text-slate-200">{exp}</p>
+                <span className="text-xs text-slate-500">τ = {tau.toFixed(4)} years</span>
+                <span className="text-xs text-slate-500">{contracts.length} strikes</span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs font-mono">
+                  <thead>
+                    <tr className="border-b border-slate-700 text-slate-400 text-[10px] uppercase tracking-wider">
+                      <th className="px-3 py-2 text-left">Strike</th>
+                      <th className="px-3 py-2 text-left">Moneyness</th>
+                      <th className="px-3 py-2 text-right">Mkt Price</th>
+                      <th className="px-3 py-2 text-right">Imp. Vol</th>
+                      <th className="px-3 py-2 text-right">BS Theoretical</th>
+                      <th className="px-3 py-2 text-right">Δ (BS)</th>
+                      <th className="px-3 py-2 text-right">Mkt−BS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {contracts.map(c => {
+                      const { label: mlbl, cls: mcls } = moneynessLabel(
+                        optType === 'call' ? c.moneyness : -c.moneyness
+                      );
+                      const bsTheo = optType === 'call'
+                        ? bsCall(spot, c.strike, tau, rfRate, c.implied_vol)
+                        : bsPut(spot, c.strike, tau, rfRate, c.implied_vol);
+                      const req = { s: spot, k: c.strike, tau, r: rfRate, sigma: c.implied_vol };
+                      const delta = computeCallGreeks(req).delta * (optType === 'put' ? -1 : 1);
+                      const diff = c.price - bsTheo;
+
+                      return (
+                        <tr key={c.strike}
+                          className={`border-b border-slate-800/50 hover:bg-slate-800/30 ${mlbl === 'ITM' ? 'bg-green-900/5' : mlbl === 'ATM' ? 'bg-yellow-900/5' : ''}`}>
+                          <td className="px-3 py-1.5 text-slate-200 font-semibold">${c.strike.toFixed(2)}</td>
+                          <td className={`px-3 py-1.5 font-semibold ${mcls}`}>{mlbl} {(c.moneyness * 100).toFixed(1)}%</td>
+                          <td className="px-3 py-1.5 text-right text-slate-200">${c.price.toFixed(4)}</td>
+                          <td className="px-3 py-1.5 text-right text-blue-300">{(c.implied_vol * 100).toFixed(2)}%</td>
+                          <td className="px-3 py-1.5 text-right text-violet-300">${bsTheo.toFixed(4)}</td>
+                          <td className="px-3 py-1.5 text-right text-amber-300">{delta.toFixed(4)}</td>
+                          <td className={`px-3 py-1.5 text-right ${Math.abs(diff) < 0.05 ? 'text-slate-500' : diff > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {diff >= 0 ? '+' : ''}{diff.toFixed(4)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))}
+
+          <p className="text-[10px] text-slate-600">
+            BS Theoretical uses live IV per strike. Mkt−BS &gt; 0 → option richer than model (vol-smile / demand premium).
+          </p>
+        </div>
+      )}
+
+      {!loading && !grouped.length && (
+        <div className="rounded-xl border border-slate-700 bg-slate-800/20 p-10 text-center">
+          <p className="text-slate-400 text-sm">Enter a symbol and click Fetch Live Chain</p>
+          <p className="text-slate-600 text-xs mt-1">Requires yfinance-listed options (e.g. AAPL, MSFT, SPY, QQQ, TSLA)</p>
+        </div>
+      )}
     </div>
   );
 };
