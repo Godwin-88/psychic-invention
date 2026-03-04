@@ -1,0 +1,37 @@
+services:
+  # Redis Cache Service
+  - type: redis
+    name: pricing-engine-redis
+    plan: starter
+    maxmemoryPolicy: noeviction
+    ipAllowList: []
+    disk: 1GB
+
+  # Web API Service
+  - type: web
+    name: pricing-engine-api
+    env: python
+    region: oregon
+    plan: starter
+    buildCommand: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && export PATH="$HOME/.cargo/bin:$PATH" && pip install --upgrade pip && pip install -r requirements.txt && maturin develop --release
+    startCommand: gunicorn app.main:app -w 2 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: RUST_VERSION
+        value: 1.70.0
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: pricing-engine-redis
+          property: connectionString
+      - key: CACHE_TTL_L1
+        value: 30
+      - key: CACHE_TTL_L2
+        value: 300
+      - key: CACHE_TTL_L3
+        value: 3600
+      - key: PYTHONUNBUFFERED
+        value: 1
+    autoDeploy: true
