@@ -1,4 +1,12 @@
 services:
+  # Redis Cache Service
+  - type: redis
+    name: pricing-engine-redis
+    plan: starter
+    maxmemoryPolicy: noeviction
+    ipAllowList: []
+
+  # Web API Service
   - type: web
     name: pricing-engine-api
     env: python
@@ -16,4 +24,15 @@ services:
         value: 3.11.0
       - key: RUST_VERSION
         value: 1.70.0
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: pricing-engine-redis
+          property: connectionString
+      - key: CACHE_TTL_L1
+        value: 30
+      - key: CACHE_TTL_L2
+        value: 300
+      - key: CACHE_TTL_L3
+        value: 3600
     autoDeploy: true

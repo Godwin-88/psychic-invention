@@ -2,7 +2,13 @@
 Market Data API Endpoints for Deriv API integration.
 
 This module provides FastAPI endpoints for accessing real-time market data
-through the Deriv API client.
+through the Deriv API client with Redis-backed caching.
+
+Cache hierarchy
+───────────────
+L1  in-process TTLCache   30 s    per-uvicorn-worker, zero-latency
+L2  Redis                 5 min   shared across all workers, sub-ms
+L3  Redis (long-TTL)      1 hr    historical / yfinance / OpenBB data
 """
 
 from fastapi import APIRouter, HTTPException, Depends
@@ -11,11 +17,13 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime, date
 import asyncio
 import logging
+import json
 
 from .deriv_api_client import (
     DerivAPIClient, MarketData, OptionChain, OptionContract,
     AssetClass, MarketDataUnavailable, ValidationError, RateLimitExceeded
 )
+from .cache.redis_cache import get_cache
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -130,11 +138,26 @@ async def get_spot_price(
 ):
     """
     Get current spot price and market data for an asset.
-    
+
     Returns real-time market data including bid/ask prices, volume,
     and implied volatility when available.
+    
+    Caching: L1 (30s) + L2 Redis (5min)
     """
     try:
+        # Try cache first
+        cache = get_cache()
+        cache_key = f"spot:{request.symbol}:{request.asset_class or 'all'}"
+        
+        cached_data = await cache.get(cache_key)
+        if cached_data is not None:
+            logger.info(f"Cache hit for spot price: {request.symbol}")
+            # Convert cached dict back to MarketDataResponse
+            return MarketDataResponse(**cached_data)
+        
+        # Cache miss - fetch from API
+        logger.info(f"Cache miss for spot price: {request.symbol}, fetching from API")
+        
         # Parse asset class if provided
         asset_class = None
         if request.asset_class:
@@ -142,18 +165,18 @@ async def get_spot_price(
                 asset_class = AssetClass(request.asset_class.lower())
             except ValueError:
                 raise HTTPException(
-                    status_code=400, 
+                    status_code=400,
                     detail=f"Invalid asset class: {request.asset_class}"
                 )
-        
+
         # Fetch market data
         market_data = await client.get_market_data(request.symbol, asset_class)
-        
+
         # Calculate data age
         current_time = datetime.utcnow().replace(tzinfo=market_data.timestamp.tzinfo)
         data_age = (current_time - market_data.timestamp).total_seconds()
-        
-        return MarketDataResponse(
+
+        response = MarketDataResponse(
             symbol=market_data.symbol,
             spot_price=market_data.spot_price,
             bid=market_data.bid,
@@ -165,18 +188,24 @@ async def get_spot_price(
             data_age_seconds=data_age
         )
         
+        # Cache the response (L2 Redis, 5 min TTL)
+        await cache.set(cache_key, response.dict(), ttl=300)
+        logger.info(f"Cached spot price for {request.symbol}")
+        
+        return response
+
     except MarketDataUnavailable as e:
         logger.warning(f"Market data unavailable for {request.symbol}: {e}")
         raise HTTPException(status_code=404, detail=str(e))
-    
+
     except ValidationError as e:
         logger.error(f"Market data validation error for {request.symbol}: {e}")
         raise HTTPException(status_code=422, detail=str(e))
-    
+
     except RateLimitExceeded as e:
         logger.warning(f"Rate limit exceeded: {e}")
         raise HTTPException(status_code=429, detail=str(e))
-    
+
     except Exception as e:
         logger.error(f"Unexpected error fetching market data for {request.symbol}: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
@@ -189,17 +218,31 @@ async def get_option_chain(
 ):
     """
     Get complete option chain for an underlying asset and expiration date.
-    
+
     Returns all available call and put options with strikes, prices,
     implied volatilities, and Greeks.
+    
+    Caching: L1 (30s) + L2 Redis (5min)
     """
     try:
+        # Try cache first
+        cache = get_cache()
+        cache_key = f"option-chain:{request.underlying}:{request.expiry}"
+        
+        cached_data = await cache.get(cache_key)
+        if cached_data is not None:
+            logger.info(f"Cache hit for option chain: {request.underlying} {request.expiry}")
+            return OptionChainResponse(**cached_data)
+        
+        # Cache miss - fetch from API
+        logger.info(f"Cache miss for option chain: {request.underlying} {request.expiry}, fetching from API")
+        
         # Convert date to string format expected by API
         expiry_str = request.expiry.strftime('%Y-%m-%d')
-        
+
         # Fetch option chain
         option_chain = await client.get_option_chain(request.underlying, expiry_str)
-        
+
         # Convert contracts to response format
         def convert_contract(contract: OptionContract) -> OptionContractResponse:
             return OptionContractResponse(
@@ -220,11 +263,11 @@ async def get_option_chain(
                 volume=contract.volume,
                 timestamp=contract.timestamp
             )
-        
+
         calls = [convert_contract(call) for call in option_chain.calls]
         puts = [convert_contract(put) for put in option_chain.puts]
-        
-        return OptionChainResponse(
+
+        response = OptionChainResponse(
             underlying=option_chain.underlying,
             expiry=option_chain.expiry,
             calls=calls,
@@ -233,18 +276,24 @@ async def get_option_chain(
             total_strikes=len(option_chain.get_strikes())
         )
         
+        # Cache the response (L2 Redis, 5 min TTL)
+        await cache.set(cache_key, response.dict(), ttl=300)
+        logger.info(f"Cached option chain for {request.underlying} {request.expiry}")
+        
+        return response
+
     except MarketDataUnavailable as e:
         logger.warning(f"Option chain unavailable for {request.underlying}: {e}")
         raise HTTPException(status_code=404, detail=str(e))
-    
+
     except ValidationError as e:
         logger.error(f"Option chain validation error for {request.underlying}: {e}")
         raise HTTPException(status_code=422, detail=str(e))
-    
+
     except RateLimitExceeded as e:
         logger.warning(f"Rate limit exceeded: {e}")
         raise HTTPException(status_code=429, detail=str(e))
-    
+
     except Exception as e:
         logger.error(f"Unexpected error fetching option chain for {request.underlying}: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")

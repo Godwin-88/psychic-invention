@@ -22,6 +22,15 @@ except ImportError:
     USING_MOCK = True
     print("Warning: Using mock pricing engine for testing")
 
+# Import Redis cache
+try:
+    from .cache.redis_cache import get_cache, close_cache
+    REDIS_AVAILABLE = True
+    print("Redis cache module loaded successfully")
+except ImportError as e:
+    print(f"Warning: Redis cache not available: {e}")
+    REDIS_AVAILABLE = False
+
 # Import market data endpoints
 try:
     from .market_data_endpoints import router as market_data_router, cleanup_deriv_client
@@ -90,10 +99,65 @@ if TRANSACT_AVAILABLE:
     @app.on_event("shutdown")
     async def shutdown_event():
         await cleanup_deriv_client()
+        if REDIS_AVAILABLE:
+            await close_cache()
 
 # Include Asset Universe (yfinance) router
 if ASSET_UNIVERSE_AVAILABLE:
     app.include_router(asset_universe_router)
+
+# Add Redis health check endpoint if available
+if REDIS_AVAILABLE:
+    @app.get("/cache/health")
+    async def cache_health_check():
+        """Health check for Redis cache"""
+        try:
+            cache = get_cache()
+            is_connected = await cache.ping()
+            stats = cache.stats()
+            
+            return {
+                "status": "healthy" if is_connected else "degraded",
+                "service": "redis-cache",
+                "redis_connected": is_connected,
+                "stats": stats,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        except Exception as e:
+            return {
+                "status": "unhealthy",
+                "service": "redis-cache",
+                "error": str(e),
+                "timestamp": datetime.utcnow().isoformat()
+            }
+    
+    @app.get("/cache/stats")
+    async def get_cache_statistics():
+        """Get detailed cache statistics"""
+        try:
+            cache = get_cache()
+            stats = cache.stats()
+            return {
+                "status": "success",
+                "cache_stats": stats,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+    
+    @app.post("/cache/clear")
+    async def clear_all_cache():
+        """Clear all cached data (L1 + L2)"""
+        try:
+            cache = get_cache()
+            deleted = await cache.clear_pattern("*")
+            return {
+                "status": "success",
+                "message": f"Cleared {deleted} keys from cache",
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
 
 class OptionRequest(BaseModel):
