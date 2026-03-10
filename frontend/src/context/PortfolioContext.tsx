@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from 'react';
 import { getAssetHistory, postPortfolioMoments, postPortfolioPerformance } from '@/utils/api';
+import { useDataProvider } from '@/context/DataProviderContext';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -86,6 +87,7 @@ const ctx = createContext<PortfolioContextValue | null>(null);
 // ── Provider ───────────────────────────────────────────────────────────────
 
 export function PortfolioProvider({ children }: { children: ReactNode }) {
+  const { dataProvider } = useDataProvider();
   const [assets, setAssetsState] = useState<PortfolioAsset[]>(DEFAULT_ASSETS);
   const [returns, setReturns] = useState<number[][] | null>(null);
   const [benchmarkReturns, setBenchmarkReturns] = useState<number[] | null>(null);
@@ -137,7 +139,7 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
       const allSymbols = [...assets.map(a => a.symbol), benchmarkSymbol];
       const histories = await Promise.all(
         allSymbols.map(sym =>
-          getAssetHistory(sym, period).catch(() => [])
+          getAssetHistory(sym, period, dataProvider).catch(() => [])
         )
       );
 
@@ -192,7 +194,7 @@ export function PortfolioProvider({ children }: { children: ReactNode }) {
       setError(msg);
       setStatus('error');
     }
-  }, [assets, benchmarkSymbol, period]);
+  }, [assets, benchmarkSymbol, period, dataProvider]);
 
   /**
    * Compute all portfolio analytics using existing returns.

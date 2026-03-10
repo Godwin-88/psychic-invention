@@ -19,3 +19,12 @@ node_modules/
 
 # Build / Cache
 frontend/node_modules/.vite/
+
+# Algorithmic Trading Strategies (large PDFs)
+AlgorithmicTradingStrategies/
+
+# Agentic Skills PDFs
+"agenticskills"/*.pdf
+"agenticskills"/**/*.pdf
+
+agenticskills/ref/

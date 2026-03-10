@@ -124,20 +124,26 @@ export const searchAssets = async (
   return response.data;
 };
 
+export type DataProviderId = 'yfinance' | 'openbb' | 'nautilus';
+
 export const getAssetHistory = async (
   symbol: string,
-  period: string = '1mo'
+  period: string = '1mo',
+  provider: DataProviderId = 'yfinance'
 ): Promise<{ date: string; open: number | null; high: number | null; low: number | null; close: number | null; volume: number | null }[]> => {
   const response = await apiClient.get(API_CONFIG.ENDPOINTS.ASSETS_HISTORY, {
-    params: { symbol, period },
+    params: { symbol, period, provider },
   });
   return response.data;
 };
 
 export const getAssetQuote = async (
-  symbol: string
+  symbol: string,
+  provider: DataProviderId = 'yfinance'
 ): Promise<{ symbol: string; spot: number; name: string; currency: string }> => {
-  const response = await apiClient.get(`${API_CONFIG.ENDPOINTS.ASSETS_QUOTE}/${symbol}`);
+  const response = await apiClient.get(`${API_CONFIG.ENDPOINTS.ASSETS_QUOTE}/${symbol}`, {
+    params: { provider },
+  });
   return response.data;
 };
 
@@ -145,6 +151,7 @@ export const getAssetOptions = async (
   symbol: string,
   nExpiries: number = 3,
   moneynessRange: number = 0.20,
+  provider: DataProviderId = 'yfinance'
 ): Promise<{
   symbol: string;
   spot: number;
@@ -159,8 +166,13 @@ export const getAssetOptions = async (
   }[];
 }> => {
   const response = await apiClient.get(`${API_CONFIG.ENDPOINTS.ASSETS_OPTIONS}/${symbol}`, {
-    params: { n_expiries: nExpiries, moneyness_range: moneynessRange },
+    params: { n_expiries: nExpiries, moneyness_range: moneynessRange, provider },
   });
+  return response.data;
+};
+
+export const getDataProviders = async (): Promise<string[]> => {
+  const response = await apiClient.get(API_CONFIG.ENDPOINTS.ASSETS_PROVIDERS);
   return response.data;
 };
 

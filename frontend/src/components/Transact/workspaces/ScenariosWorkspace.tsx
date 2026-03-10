@@ -12,9 +12,11 @@
  *   /transact/scenarios/monte-carlo    → MonteCarloPanel          (M1 L2: path simulation)
  *   /transact/scenarios/cov-stress     → CovStressPanel           (M7: Σ stress)
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { ScenariosProvider, useScenariosContext } from '@/context/ScenariosContext';
+import { useAgentContext, DEFAULT_SUGGESTED_QUESTIONS } from '@/context/AgentContext';
+import { MathText } from '@/components/ui/Math';
 import { AssetSearchBar }           from '@/components/AssetSearchBar';
 import { ScenarioDefinitionPanel }  from '@/components/Scenarios/ScenarioDefinitionPanel';
 import { ProbabilisticPanel }       from '@/components/Scenarios/ProbabilisticPanel';
@@ -22,13 +24,59 @@ import { BehavioralPanel }          from '@/components/Scenarios/BehavioralPanel
 import { MonteCarloPanel }          from '@/components/Scenarios/MonteCarloPanel';
 import { CovStressPanel }           from '@/components/Scenarios/CovStressPanel';
 
+// ── Agent context sync hook ────────────────────────────────────────────────────
+function useScenariosAgentSync() {
+  const { setWorkspaceContext } = useAgentContext();
+  const { symbols, returnMatrix, scenarioResult, mcResult, behavResult, probResult } = useScenariosContext();
+
+  useEffect(() => {
+    const rawData: Record<string, unknown> = {};
+    const metrics: Record<string, string | number | null> = {
+      assets: symbols.join(', ') || 'none',
+      observations: returnMatrix.length,
+    };
+
+    if (scenarioResult) {
+      rawData.scenario = scenarioResult;
+      metrics['stressed_return'] = (scenarioResult.stressed_portfolio_return * 100).toFixed(2) + '%';
+      metrics['stressed_vol']    = (scenarioResult.stressed_portfolio_volatility * 100).toFixed(2) + '%';
+    }
+    if (mcResult) {
+      rawData.monte_carlo = mcResult;
+      metrics['mc_var_95']  = (mcResult.var_95 * 100).toFixed(2) + '%';
+      metrics['mc_cvar_95'] = (mcResult.cvar_95 * 100).toFixed(2) + '%';
+    }
+    if (behavResult) {
+      rawData.behavioral = behavResult;
+      if (behavResult.base_var_95 != null)
+        metrics['behav_var_95'] = (behavResult.base_var_95 * 100).toFixed(2) + '%';
+    }
+    if (probResult) {
+      rawData.probabilistic = probResult;
+    }
+
+    const hasResults = scenarioResult || mcResult || behavResult || probResult;
+    const summary = hasResults
+      ? `Scenario Engine: ${symbols.length} assets — ${[scenarioResult && 'Stress', mcResult && 'MC', behavResult && 'Behavioral', probResult && 'Probabilistic'].filter(Boolean).join(', ')} computed`
+      : `Scenario Engine: ${symbols.length > 0 ? symbols.length + ' assets loaded' : 'no data loaded yet'}`;
+
+    setWorkspaceContext({
+      menuId: 'scenarios',
+      summary,
+      metrics,
+      suggestedQuestions: DEFAULT_SUGGESTED_QUESTIONS.scenarios,
+      ...(hasResults ? { rawData } : {}),
+    });
+  }, [symbols, returnMatrix, scenarioResult, mcResult, behavResult, probResult, setWorkspaceContext]);
+}
+
 // ── Panel metadata ─────────────────────────────────────────────────────────────
 const PANEL_META: Record<string, { title: string; badge: string; desc: string }> = {
-  definition:    { title: 'Scenario Definition',              badge: 'M3 L4 · Stress',     desc: 'Custom return/vol/correlation shocks · Historical crisis overlays: GFC, COVID, Quant Meltdown' },
-  probabilistic: { title: 'Probabilistic Scenario Optimisation', badge: 'M3 L4 · PSO',     desc: 'E[r] = Σ pₖ·rₖ · Σ = Σ pₖ(rₖ−E[r])(rₖ−E[r])^T · min-variance with return floor' },
-  behavioral:    { title: 'Behavioral Scenarios',            badge: 'M4 · KT 1992',          desc: 'Prospect Theory v(x) · loss aversion λ ≈ 2.25 · herding VaR under correlation stress' },
-  'monte-carlo': { title: 'Monte Carlo Simulation',          badge: 'M1 L2 · Paths',         desc: 'n paths · W_T = W₀ · ∏(1+r_t) · Normal or Student-t · VaR/CVaR from P&L distribution' },
-  'cov-stress':  { title: 'Covariance Stress Testing',       badge: 'M7 · Shrinkage',        desc: 'Σ_stressed = D·clip(ρ+Δρ)·D · volatility spikes · Ledoit-Wolf vs OAS context' },
+  definition:    { title: 'Scenario Definition',              badge: 'M3 L4 · Stress',     desc: 'Custom $\\Delta r, \\Delta\\sigma, \\Delta\\Sigma$ shocks · Historical overlays: GFC 2008, COVID 2020, Quant Meltdown 2007' },
+  probabilistic: { title: 'Probabilistic Scenario Optimisation', badge: 'M3 L4 · PSO',     desc: '$\\mathbb{E}[r] = \\sum_k p_k r_k$ · $\\Sigma = \\sum_k p_k(r_k - \\mathbb{E}[r])(r_k - \\mathbb{E}[r])^\\top$ · min-variance with return floor' },
+  behavioral:    { title: 'Behavioral Scenarios',            badge: 'M4 · KT 1992',          desc: 'Prospect Theory $v(x) = x^\\alpha$ (gains), $-\\lambda(-x)^\\beta$ (losses) · $\\lambda \\approx 2.25$ · herding VaR' },
+  'monte-carlo': { title: 'Monte Carlo Simulation',          badge: 'M1 L2 · Paths',         desc: '$n$ paths · $W_T = W_0\\prod_t(1+r_t)$ · $r_t \\sim \\mathcal{N}(\\mu, \\Sigma)$ or Student-$t$ · VaR/CVaR from terminal P&L' },
+  'cov-stress':  { title: 'Covariance Stress Testing',       badge: 'M7 · Shrinkage',        desc: '$\\Sigma_{\\text{stress}} = D\\cdot\\text{clip}(\\rho + \\Delta\\rho)\\cdot D$ · vol spikes · Ledoit-Wolf vs OAS shrinkage' },
 };
 
 // ── Shared Data Source Panel ─────────────────────────────────────────────────
@@ -125,6 +173,7 @@ function DataSourcePanel() {
 
 // ── Inner workspace ────────────────────────────────────────────────────────────
 function ScenariosWorkspaceInner() {
+  useScenariosAgentSync();
   const location = useLocation();
 
   function getActiveTab() {
@@ -148,7 +197,7 @@ function ScenariosWorkspaceInner() {
             {meta.badge}
           </span>
         </div>
-        <p className="text-sm text-slate-400 ml-9">{meta.desc}</p>
+        <p className="text-sm text-slate-400 ml-9"><MathText text={meta.desc} /></p>
       </div>
 
       {/* Shared data source */}

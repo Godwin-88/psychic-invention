@@ -23,6 +23,7 @@ import {
   postScenariosMonteCarlo,
   postScenariosBehavioral,
 } from '@/utils/api';
+import { useDataProvider } from '@/context/DataProviderContext';
 
 // ── Result types ──────────────────────────────────────────────────────────────
 
@@ -122,6 +123,7 @@ export const useScenariosContext = () => {
 
 // ── Provider ───────────────────────────────────────────────────────────────────
 export const ScenariosProvider = ({ children }: { children: ReactNode }) => {
+  const { dataProvider } = useDataProvider();
   const [symbols, setSymbols]           = useState<string[]>([]);
   const [returnMatrix, setReturnMatrix] = useState<number[][]>([]);
   const [labels, setLabels]             = useState<string[]>([]);
@@ -153,7 +155,7 @@ export const ScenariosProvider = ({ children }: { children: ReactNode }) => {
     try {
       const usePeriod = per ?? period;
       const results = await Promise.all(
-        syms.map(sym => getAssetHistory(sym, usePeriod))
+        syms.map(sym => getAssetHistory(sym, usePeriod, dataProvider))
       );
 
       // Find common dates (intersection) — filter out null closes
@@ -188,7 +190,7 @@ export const ScenariosProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setMultiLoading(false);
     }
-  }, [period]);
+  }, [period, dataProvider]);
 
   // ── Scenario Run ─────────────────────────────────────────────────────────────
   const computeScenario = useCallback(async (

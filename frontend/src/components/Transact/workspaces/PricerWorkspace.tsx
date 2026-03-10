@@ -7,24 +7,37 @@
  *   chain      → OptionChainWorkspace (yfinance live chain · BS theoretical)
  *   capm       → CAPMWorkspace     (live β · SML · Δ-adjusted exposure)
  */
+import { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useAgentContext, DEFAULT_SUGGESTED_QUESTIONS } from '@/context/AgentContext';
+import { MathText } from '@/components/ui/Math';
 import { PricingWorkspace }       from '@/components/PricingWorkspace';
 import { GreeksDashboard }        from '@/components/Pricer/GreeksDashboard';
 import { OptionChainWorkspace }   from '@/components/Transact/workspaces/OptionChainWorkspace';
 import { CAPMWorkspace }          from '@/components/Transact/workspaces/CAPMWorkspace';
 
 const TABS = [
-  { id: 'pricing', label: 'Pricing',      badge: 'BS · FFT · Heston',  desc: 'Multi-model: C = SN(d₁)−Ke⁻ʳᵗN(d₂) · Carr-Madan FFT · Heston SV · live spot + IV' },
-  { id: 'greeks',  label: 'Greeks',       badge: 'Δ Γ Θ ν ρ',         desc: 'Analytical vs numerical · Δ/Γ heatmap (S×K grid) · all 3 models' },
-  { id: 'chain',   label: 'Option Chain', badge: 'yfinance · live',    desc: 'Strike×Expiry grid · implied vol · BS theoretical · ITM/ATM/OTM' },
-  { id: 'capm',    label: 'CAPM',         badge: 'M1 §2 · β live',     desc: 'E(Ri) = Rf + β(Rm−Rf) · live beta from 1-year daily log-returns · Δ-adjusted exposure' },
+  { id: 'pricing', label: 'Pricing',      badge: 'BS · FFT · Heston',  desc: 'Multi-model: $C = SN(d_1) - Ke^{-rT}N(d_2)$ · Carr-Madan FFT · Heston SV · live spot + IV' },
+  { id: 'greeks',  label: 'Greeks',       badge: 'Δ Γ Θ ν ρ',         desc: 'Analytical vs numerical · $\\Delta, \\Gamma$ heatmap ($S \\times K$ grid) · all 3 models' },
+  { id: 'chain',   label: 'Option Chain', badge: 'yfinance · live',    desc: 'Strike$\\times$Expiry grid · implied vol · BS theoretical · ITM/ATM/OTM' },
+  { id: 'capm',    label: 'CAPM',         badge: 'M1 §2 · β live',     desc: '$E(R_i) = R_f + \\beta(R_m - R_f)$ · live beta from 1-year daily log-returns · $\\Delta$-adjusted exposure' },
 ] as const;
 
 type TabId = typeof TABS[number]['id'];
 
 export const PricerWorkspace = () => {
+  const { setWorkspaceContext } = useAgentContext();
   const location = useLocation();
   const navigate  = useNavigate();
+
+  useEffect(() => {
+    setWorkspaceContext({
+      menuId: 'pricer',
+      summary: 'Derivatives Pricer: Black-Scholes, FFT, Heston models with live market data',
+      suggestedQuestions: DEFAULT_SUGGESTED_QUESTIONS.pricer,
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function getActive(): TabId {
     const seg = location.pathname.split('/').pop() ?? '';
@@ -50,7 +63,7 @@ export const PricerWorkspace = () => {
             {meta.badge}
           </span>
         </div>
-        <p className="text-sm text-slate-400 ml-9">{meta.desc}</p>
+        <p className="text-sm text-slate-400 ml-9"><MathText text={meta.desc} /></p>
       </div>
 
       {/* Tab nav */}

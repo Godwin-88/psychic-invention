@@ -7,6 +7,7 @@
  */
 import { useState, useEffect } from 'react';
 import { useVolatility } from '@/context/VolatilityContext';
+import { MathText } from '@/components/ui/Math';
 
 const pct  = (v: number) => (v * 100).toFixed(2) + '%';
 const fmt4 = (v: number) => v.toFixed(4);
@@ -267,9 +268,9 @@ export const HestonPanel = () => {
       {/* Theory */}
       <div className="rounded-xl border border-slate-700 bg-slate-800/30 p-4 text-xs text-slate-500 space-y-1">
         <p className="font-semibold text-slate-300">Heston (1993) Calibration — Live Data</p>
-        <p>Option chain fetched from yfinance: bid/ask mid-price used as C_market for each (K,τ).</p>
-        <p>Minimise RMSE = √(Σ(C_Heston(κ,θ,ξ,ρ,v₀) − C_market)²/N) via L-BFGS-B (scipy).</p>
-        <p>Feller condition 2κθ {'>'} ξ² ensures variance process v(t) stays strictly positive.</p>
+        <p><MathText text="Option chain from yfinance: bid/ask mid-price used as $C_{\text{market}}$ for each $(K,\tau)$." /></p>
+        <p><MathText text="Minimise $\mathrm{RMSE} = \sqrt{\tfrac{1}{N}\sum_i(C_{\text{Heston}}(\kappa,\theta,\xi,\rho,v_0) - C_{\text{market}})^2}$ via L-BFGS-B." /></p>
+        <p><MathText text="Feller condition $2\kappa\theta > \xi^2$ ensures variance process $v(t) > 0$ strictly." /></p>
         <p>Calibrated params automatically update the IV Surface panel.</p>
       </div>
     </div>

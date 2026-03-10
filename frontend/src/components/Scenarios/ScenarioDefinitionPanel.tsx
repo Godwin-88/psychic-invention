@@ -12,6 +12,7 @@
  */
 import { useState } from 'react';
 import { useScenariosContext } from '@/context/ScenariosContext';
+import { MathText } from '@/components/ui/Math';
 
 const pct = (v: number) => (v * 100).toFixed(2) + '%';
 const fmt3 = (v: number) => v.toFixed(4);
@@ -246,9 +247,9 @@ export const ScenarioDefinitionPanel = () => {
       {/* Theory */}
       <div className="rounded-xl border border-slate-700 bg-slate-800/30 p-4 text-xs text-slate-500 space-y-1">
         <p className="font-semibold text-slate-300">Scenario Stress Testing (M3 L4)</p>
-        <p>{'Stressed μ_i = μ_i + Δr_i — direct return shock per asset.'}</p>
-        <p>{'Stressed σ_i = σ_i · (1 + Δσ_i) — proportional volatility scaling.'}</p>
-        <p>{'Stressed ρ_ij = clip(ρ_ij + Δρ, -0.99, 0.99) — uniform correlation shift (flight to quality).'}</p>
+        <p><MathText text="Stressed $\mu_i = \mu_i + \Delta r_i$ — direct return shock per asset." /></p>
+        <p><MathText text="Stressed $\sigma_i = \sigma_i \cdot (1 + \Delta\sigma_i)$ — proportional volatility scaling." /></p>
+        <p><MathText text="Stressed $\rho_{ij} = \mathrm{clip}(\rho_{ij} + \Delta\rho,\,-0.99,\,0.99)$ — uniform correlation shift (flight to quality)." /></p>
         <p>Historical crises: GFC 2008 (−37% return, +50% corr) · COVID 2020 (−20%, +30%) · Quant Melt 2007 (−10%, +40%).</p>
       </div>
     </div>

@@ -13,14 +13,16 @@
  * Model agreement: flag |FFT−BS|/BS > 1% or |Heston−BS|/BS > 5%
  * Greeks: client-side BS (Δ, Γ, Θ, ν, ρ) — no extra request needed
  */
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { MathBlock, MathInline } from '@/components/ui/Math';
+import { useAgentContext, DEFAULT_SUGGESTED_QUESTIONS } from '@/context/AgentContext';
 import {
   priceCallBS, pricePutBS,
   priceCallFFTOpt, pricePutFFTOpt,
   priceCallHeston, pricePutHeston,
   getAssetQuote, getAssetOptions,
 } from '@/utils/api';
+import { useDataProvider } from '@/context/DataProviderContext';
 import { computeCallGreeks, computePutGreeks } from '@/utils/greeks';
 import type { OptionRequest } from '@/types';
 
@@ -54,6 +56,9 @@ const H_FLD: { key: keyof HestonParams; label: string; step: number; min: number
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export const PricingWorkspace = ({ defaultTab: _tab = 'bs' }: { defaultTab?: string }) => {
+  const { dataProvider } = useDataProvider();
+  const { setWorkspaceContext } = useAgentContext();
+
   const [symbol,       setSymbol]       = useState('');
   const [quoteInfo,    setQuoteInfo]    = useState<{ spot: number; name: string } | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(false);
@@ -90,7 +95,7 @@ export const PricingWorkspace = ({ defaultTab: _tab = 'bs' }: { defaultTab?: str
       setHeston(prev => ({ ...prev, v0: Math.round(iv ** 2 * 1000) / 1000, theta: Math.round(iv ** 2 * 1000) / 1000 }));
     } catch { setError(`Could not load quote for ${sym}. Check symbol.`); }
     finally { setQuoteLoading(false); }
-  }, [params.sigma]);
+  }, [params.sigma, dataProvider]);
 
   // ── Price all models ────────────────────────────────────────────────────────
   const priceAll = useCallback(async () => {
@@ -142,6 +147,87 @@ export const PricingWorkspace = ({ defaultTab: _tab = 'bs' }: { defaultTab?: str
       threshold: m.label.includes('Heston') ? 5 : 1,
     }));
   }, [results, optType]);
+
+  // ── Sync computed results to AgentContext ────────────────────────────────────
+  useEffect(() => {
+    const rawData: Record<string, unknown> = {
+      option_type: optType,
+      parameters: {
+        spot_S: params.s,
+        strike_K: params.k,
+        time_to_maturity_tau_years: params.tau,
+        risk_free_rate_r: params.r,
+        bs_volatility_sigma: params.sigma,
+      },
+      heston_parameters: {
+        v0_initial_variance: heston.v0,
+        kappa_mean_reversion: heston.kappa,
+        theta_long_run_variance: heston.theta,
+        xi_vol_of_vol: heston.sigma_v,
+        rho_spot_vol_correlation: heston.rho,
+        feller_condition_satisfied: fellerOK(heston),
+        feller_check: `2κθ=${(2*heston.kappa*heston.theta).toFixed(4)} vs ξ²=${(heston.sigma_v**2).toFixed(4)}`,
+      },
+    };
+
+    const metrics: Record<string, string | number | null> = {
+      'S (Spot)': params.s,
+      'K (Strike)': params.k,
+      'τ (Years)': params.tau,
+      'σ (Vol)': `${(params.sigma * 100).toFixed(1)}%`,
+      'r (Rate)': `${(params.r * 100).toFixed(2)}%`,
+    };
+
+    if (quoteInfo) {
+      rawData.live_asset = { symbol, name: quoteInfo.name, live_spot: quoteInfo.spot };
+    }
+
+    if (results) {
+      rawData.model_prices = results.map(m => ({
+        model: m.label,
+        call_price: +m.call.toFixed(4),
+        put_price: +m.put.toFixed(4),
+        put_call_parity_error: +(Math.abs(m.call - m.put - (params.s - params.k * Math.exp(-params.r * params.tau)))).toFixed(6),
+      }));
+      results.forEach(m => {
+        metrics[`${m.label} ${optType}`] = (optType === 'call' ? m.call : m.put).toFixed(4);
+      });
+      if (results.length >= 2) {
+        const bs = optType === 'call' ? results[0].call : results[0].put;
+        const fft = optType === 'call' ? results[1].call : results[1].put;
+        rawData.model_agreement = {
+          fft_vs_bs_pct_deviation: +((Math.abs(fft - bs) / Math.max(Math.abs(bs), 1e-8)) * 100).toFixed(3),
+          ...(results[2] ? {
+            heston_vs_bs_pct_deviation: +((Math.abs((optType === 'call' ? results[2].call : results[2].put) - bs) / Math.max(Math.abs(bs), 1e-8)) * 100).toFixed(3),
+          } : {}),
+        };
+      }
+    }
+
+    if (greeks) {
+      rawData.greeks_bs = {
+        delta: +greeks.delta.toFixed(4),
+        gamma: +greeks.gamma.toFixed(4),
+        theta_per_day: +greeks.theta.toFixed(4),
+        vega_per_1pct_vol: +(greeks.vega / 100).toFixed(4),
+        rho: +greeks.rho.toFixed(4),
+      };
+      metrics['Δ Delta'] = greeks.delta.toFixed(4);
+      metrics['ν Vega'] = greeks.vega.toFixed(4);
+      metrics['Γ Gamma'] = greeks.gamma.toFixed(4);
+    }
+
+    const bsPrice = results ? (optType === 'call' ? results[0].call : results[0].put) : null;
+    setWorkspaceContext({
+      menuId: 'pricer',
+      summary: results
+        ? `${symbol || 'Option'} ${optType.toUpperCase()} · S=${params.s} K=${params.k} τ=${params.tau}y σ=${(params.sigma*100).toFixed(0)}% · BS=${bsPrice?.toFixed(4) ?? 'N/A'}`
+        : `${symbol || 'Option'} ${optType} — S=${params.s} K=${params.k} τ=${params.tau}y σ=${(params.sigma*100).toFixed(0)}% — run pricing to compute`,
+      metrics,
+      rawData,
+      suggestedQuestions: DEFAULT_SUGGESTED_QUESTIONS.pricer,
+    });
+  }, [results, greeks, params, heston, optType, symbol, quoteInfo, setWorkspaceContext]);
 
   // ── Input helper ────────────────────────────────────────────────────────────
   const inp = (

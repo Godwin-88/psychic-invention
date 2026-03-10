@@ -5,6 +5,7 @@
  */
 import { useVolatility } from '@/context/VolatilityContext';
 import type { HestonParams } from '@/context/VolatilityContext';
+import { MathText } from '@/components/ui/Math';
 
 const pct = (v: number) => (v * 100).toFixed(1) + '%';
 
@@ -275,9 +276,9 @@ export const IVSurfacePanel = () => {
       {/* Theory note */}
       <div className="rounded-xl border border-slate-700 bg-slate-800/30 p-4 text-xs text-slate-500 space-y-1">
         <p className="font-semibold text-slate-300">Heston Stochastic Volatility Model</p>
-        <p>dS = μS dt + √v S dW₁  ·  dv = κ(θ−v) dt + ξ√v dW₂  ·  Corr(dW₁,dW₂)=ρ</p>
-        <p>Feller condition: 2κθ {'>'} ξ² ensures v(t) {'>'} 0. Negative ρ generates left skew (equity smile).</p>
-        <p>κ: mean-reversion speed · θ: long-run variance · ξ: vol-of-vol · v₀: initial variance</p>
+        <p><MathText text="$dS = \mu S\,dt + \sqrt{v}\,S\,dW_1 \;\cdot\; dv = \kappa(\theta - v)\,dt + \xi\sqrt{v}\,dW_2 \;\cdot\; \mathrm{Corr}(dW_1,dW_2) = \rho$" /></p>
+        <p><MathText text="Feller condition: $2\kappa\theta > \xi^2$ ensures $v(t) > 0$. Negative $\rho$ generates left skew (equity smile)." /></p>
+        <p><MathText text="$\kappa$: mean-reversion speed · $\theta$: long-run variance · $\xi$: vol-of-vol · $v_0$: initial variance" /></p>
       </div>
     </div>
   );

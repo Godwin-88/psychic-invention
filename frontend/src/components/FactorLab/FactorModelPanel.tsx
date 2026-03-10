@@ -5,6 +5,7 @@
  * Displays: per-asset α, β, R², residual variance + covariance decomposition.
  */
 import { useFactorContext } from '@/context/FactorContext';
+import { MathText } from '@/components/ui/Math';
 
 const pct  = (v: number) => (v * 100).toFixed(2) + '%';
 const fmt3 = (v: number) => v.toFixed(3);
@@ -220,9 +221,9 @@ export const FactorModelPanel = () => {
       {/* Theory */}
       <div className="rounded-xl border border-slate-700 bg-slate-800/30 p-4 text-xs text-slate-500 space-y-1">
         <p className="font-semibold text-slate-300">CAPM Factor Model (M2 L4)</p>
-        <p>R_it = α_i + β_i · R_Mt + ε_it — estimated by time-series OLS for each asset i.</p>
-        <p>Covariance: Ω̂ = BΣ_fB^T + Σ_ε · Systematic: β²_i σ²_m · Idiosyncratic: σ²_ε,i</p>
-        <p>R² = 1 − σ²_ε / σ²_R — fraction of variance explained by the market factor.</p>
+        <p><MathText text="$R_{it} = \alpha_i + \beta_i R_{Mt} + \varepsilon_{it}$ — estimated by time-series OLS for each asset $i$." /></p>
+        <p><MathText text="Covariance: $\hat{\Omega} = B\Sigma_f B^\top + \Sigma_\varepsilon$ · Systematic: $\beta_i^2\sigma_m^2$ · Idiosyncratic: $\sigma^2_{\varepsilon,i}$" /></p>
+        <p><MathText text="$R^2 = 1 - \sigma^2_\varepsilon / \sigma^2_R$ — fraction of variance explained by the market factor." /></p>
       </div>
     </div>
   );

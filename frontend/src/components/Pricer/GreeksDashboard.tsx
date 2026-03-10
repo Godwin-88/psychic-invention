@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { postGreeksCall, postGreeksPut, getAssetHistory } from '@/utils/api';
 import { useSelectedAssets } from '@/context/SelectedAssetsContext';
+import { useDataProvider } from '@/context/DataProviderContext';
 import { downloadFile, generateFilename } from '@/utils/export';
 import { GreekDiagrams } from './GreekDiagrams';
 import { MathBlock } from '@/components/ui/Math';
@@ -161,6 +162,7 @@ const GREEK_LABELS: Record<string, string> = {
 
 export const GreeksDashboard = () => {
   const { selectedAssets } = useSelectedAssets();
+  const { dataProvider } = useDataProvider();
   const [s, setS] = useState(100);
   const [k, setK] = useState(100);
   const [tau, setTau] = useState(0.25);
@@ -188,7 +190,7 @@ export const GreeksDashboard = () => {
       }
     })();
     return () => { cancelled = true; };
-  }, [firstAssetSymbol]);
+  }, [firstAssetSymbol, dataProvider]);
 
   const models = [
     { id: 'bs' as const, label: 'Black-Scholes', desc: 'Analytical closed-form' },

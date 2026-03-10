@@ -13,9 +13,11 @@
  *   /transact/optimizer/hrp         → Hierarchical Risk Parity (M7 L4)
  *   /transact/optimizer/compare     → Strategy Comparison
  */
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { OptimizerProvider, useOptimizer } from '@/context/OptimizerContext';
+import { useAgentContext, DEFAULT_SUGGESTED_QUESTIONS } from '@/context/AgentContext';
+import { MathText } from '@/components/ui/Math';
 import { AssetSearchBar } from '@/components/AssetSearchBar';
 import { MVOPanel }        from '@/components/Optimizer/MVOPanel';
 import { BLMPanel }        from '@/components/Optimizer/BLMPanel';
@@ -24,37 +26,83 @@ import { RiskParityPanel } from '@/components/Optimizer/RiskParityPanel';
 import { HRPPanel }        from '@/components/Optimizer/HRPPanel';
 import { ComparisonPanel } from '@/components/Optimizer/ComparisonPanel';
 
+// ── Agent context sync hook ────────────────────────────────────────────────────
+function useOptimizerAgentSync() {
+  const { setWorkspaceContext } = useAgentContext();
+  const { returns, labels, dataSource, mvoResult, blmResult, kellyResult, rpResult, hrpResult } = useOptimizer();
+
+  useEffect(() => {
+    const rawData: Record<string, unknown> = {};
+    const metrics: Record<string, string | number | null> = {
+      assets: labels.join(', ') || 'none',
+      observations: returns.length,
+      data_source: dataSource,
+    };
+
+    if (mvoResult) {
+      rawData.mvo = mvoResult;
+      if (mvoResult.tangency) {
+        metrics['tangency_return'] = (mvoResult.tangency.expected_return * 100).toFixed(2) + '%';
+        metrics['tangency_vol']    = (mvoResult.tangency.volatility * 100).toFixed(2) + '%';
+      }
+    }
+    if (blmResult) {
+      rawData.blm = blmResult;
+      metrics['blm_sharpe'] = blmResult.sharpe_ratio.toFixed(3);
+    }
+    if (rpResult)    rawData.risk_parity = rpResult;
+    if (hrpResult)   rawData.hrp         = hrpResult;
+    if (kellyResult) {
+      rawData.kelly = kellyResult;
+      metrics['kelly_growth'] = (kellyResult.expected_growth * 100).toFixed(2) + '%';
+    }
+
+    const hasResults = mvoResult || blmResult || rpResult || hrpResult || kellyResult;
+    const summary = hasResults
+      ? `Optimizer: ${labels.length} assets, ${dataSource} data — ${[mvoResult && 'MVO', blmResult && 'BLM', rpResult && 'RP', hrpResult && 'HRP', kellyResult && 'Kelly'].filter(Boolean).join(', ')} computed`
+      : `Optimizer: ${labels.length} assets loaded (${dataSource}), no results yet`;
+
+    setWorkspaceContext({
+      menuId: 'optimizer',
+      summary,
+      metrics,
+      suggestedQuestions: DEFAULT_SUGGESTED_QUESTIONS.optimizer,
+      ...(hasResults ? { rawData } : {}),
+    });
+  }, [returns, labels, dataSource, mvoResult, blmResult, kellyResult, rpResult, hrpResult, setWorkspaceContext]);
+}
+
 // ── Panel metadata ─────────────────────────────────────────────────────────────
 const PANEL_META: Record<string, { title: string; badge: string; desc: string }> = {
   mvo: {
     title: 'Mean-Variance Optimization',
     badge: 'M1 L4',
-    desc:  'Efficient frontier (QP via CVXPY) · GMV · Tangency · Capital Allocation Line',
+    desc:  '$\\min_w \\mathbf{w}^\\top \\Sigma \\mathbf{w}$ s.t. $\\mathbf{w}^\\top \\mathbf{1}=1$ · Efficient frontier (CVXPY QP) · GMV · Tangency · CAL',
   },
   blm: {
     title: 'Black-Litterman Model',
     badge: 'M3 L1',
-    desc:  'Equilibrium π=δΣw_m · Posterior μ_BL blends views (P,Q,Ω) with prior · CAPM-consistent',
+    desc:  'Equilibrium $\\pi = \\delta \\Sigma w_m$ · Posterior $\\mu_{BL}$ blends views $(P, Q, \\Omega)$ with prior · CAPM-consistent',
   },
   kelly: {
     title: 'Kelly Criterion',
     badge: 'M5 L1',
-    desc:  'Single-asset G(f)=p·ln(1+bf)+q·ln(1−f) · Multi-asset max E[ln(1+w^Tr)] · Fractional Kelly κ',
+    desc:  'Single-asset $G(f) = p\\ln(1+bf) + q\\ln(1-f)$ · Multi-asset $\\max\\, \\mathbb{E}[\\ln(1 + \\mathbf{w}^\\top r)]$ · Fractional Kelly $\\kappa$',
   },
   'risk-parity': {
     title: 'Risk Parity — ERC / RRP',
     badge: 'M5 L3',
-    desc:  'ERC: RC_i=w_i(Σw)_i/σ=σ/N · Relaxed RP with return-tilt ρ (SOCP via CVXPY)',
+    desc:  'ERC: $RC_i = w_i(\\Sigma w)_i / \\sigma = \\sigma/N$ · Relaxed RP with return-tilt $\\rho$ (SOCP via CVXPY)',
   },
   hrp: {
     title: 'Hierarchical Risk Parity',
     badge: 'M7 L4',
-    desc:  'Mantegna distance d(ρ)=√(2(1−ρ)) · Ward clustering · Quasi-diagonalisation · Recursive bisection',
+    desc:  'Mantegna distance $d(\\rho) = \\sqrt{2(1-\\rho)}$ · Ward clustering · Quasi-diagonalisation · Recursive bisection',
   },
   compare: {
     title: 'Strategy Comparison',
     badge: 'M1–M7',
-    desc:  'Side-by-side: MVO · BLM · Risk Parity · HRP · Kelly — weight table, profile radar, HHI',
+    desc:  'Side-by-side: MVO · BLM · Risk Parity · HRP · Kelly — weight table · profile radar · $\\text{HHI} = \\sum_i w_i^2$',
   },
 };
 
@@ -201,6 +249,7 @@ function ActivePanel({ tab }: { tab: string }) {
 
 // ── Inner workspace ───────────────────────────────────────────────────────────
 function OptimizerWorkspaceInner() {
+  useOptimizerAgentSync();
   const location = useLocation();
 
   function getActiveTab() {
@@ -226,7 +275,7 @@ function OptimizerWorkspaceInner() {
             {meta.badge}
           </span>
         </div>
-        <p className="text-sm text-slate-400 ml-9">{meta.desc}</p>
+        <p className="text-sm text-slate-400 ml-9"><MathText text={meta.desc} /></p>
       </div>
 
       {/* Data source panel */}

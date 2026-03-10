@@ -12,10 +12,12 @@
  *   /transact/risk/mst         → MST Graph          (M7 L3)
  *   /transact/risk/dashboard   → Risk Dashboard     (Basel III)
  */
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { RiskProvider, useRisk } from '@/context/RiskContext';
 import { AssetSearchBar } from '@/components/AssetSearchBar';
+import { useAgentContext, DEFAULT_SUGGESTED_QUESTIONS } from '@/context/AgentContext';
+import { MathText } from '@/components/ui/Math';
 import { VaRCalculatorPanel }     from '@/components/Risk/VaRCalculatorPanel';
 import { GreeksAggregationPanel } from '@/components/Risk/GreeksAggregationPanel';
 import { CovarianceHealthPanel }  from '@/components/Risk/CovarianceHealthPanel';
@@ -27,27 +29,27 @@ const PANEL_META: Record<string, { title: string; badge: string; desc: string }>
   var: {
     title: 'VaR Calculator',
     badge: 'M1 L2',
-    desc:  'Historical · Parametric Normal · Parametric t-dist · Monte Carlo (100k paths)',
+    desc:  'Historical · Parametric Normal · Parametric $t$-dist · Monte Carlo (100k paths)',
   },
   greeks: {
     title: 'Greeks Aggregation',
     badge: 'M1 L2 §8',
-    desc:  'Portfolio Δ, Γ, ν, θ · Delta-VaR · Gamma-adjusted VaR (50k MC)',
+    desc:  'Portfolio $\\Delta, \\Gamma, \\nu, \\theta$ · Delta-VaR · Gamma-adjusted VaR (50k MC)',
   },
   covariance: {
     title: 'Covariance Health',
     badge: 'M7 L1–3',
-    desc:  'Condition number κ · Ledoit-Wolf shrinkage · OAS shrinkage · Eigenspectrum',
+    desc:  'Condition number $\\kappa$ · Ledoit-Wolf shrinkage · OAS shrinkage · Eigenspectrum',
   },
   mst: {
     title: 'MST Graph',
     badge: 'M7 L3',
-    desc:  'Correlation-distance graph d(ρ) = √(2(1−ρ)) · Minimum Spanning Tree (Mantegna 1999)',
+    desc:  'Correlation-distance $d(\\rho) = \\sqrt{2(1-\\rho)}$ · Minimum Spanning Tree (Mantegna 1999)',
   },
   dashboard: {
     title: 'Risk Dashboard',
     badge: 'Basel III',
-    desc:  'Multi-confidence × multi-horizon VaR & ES grid · Basel III 99 % / 10-day benchmark',
+    desc:  'Multi-confidence $\\times$ multi-horizon VaR & ES grid · Basel III 99% / 10-day benchmark',
   },
 };
 
@@ -219,9 +221,78 @@ function ActivePanel({ activeTab }: { activeTab: string }) {
   }
 }
 
+// ── Agent context sync ────────────────────────────────────────────────────────
+function useRiskAgentSync() {
+  const { varData, covHealthData, mstData, labels, weights, portfolioValue, alpha, horizonDays } = useRisk();
+  const { setWorkspaceContext } = useAgentContext();
+
+  useEffect(() => {
+    if (!varData && !covHealthData) return;
+    const metrics: Record<string, string> = {};
+    const rawData: Record<string, unknown> = {
+      assets: labels.join(', '),
+      weights: weights.map((w, i) => `${labels[i] ?? i}: ${(w * 100).toFixed(1)}%`).join(', '),
+      portfolio_value: `$${portfolioValue.toLocaleString()}`,
+      confidence_level: `${(alpha * 100).toFixed(0)}%`,
+      horizon_days: horizonDays,
+    };
+
+    if (varData) {
+      const varMethods = varData.var ?? {};
+      const esMethods = varData.es ?? {};
+      Object.entries(varMethods).slice(0, 3).forEach(([m, v]) => {
+        metrics[`VaR ${m.replace(/_/g, ' ')}`] = `$${(v).toFixed(0)}`;
+      });
+      Object.entries(esMethods).slice(0, 2).forEach(([m, v]) => {
+        metrics[`ES ${m.replace(/_/g, ' ')}`] = `$${(v).toFixed(0)}`;
+      });
+      rawData.var_results = varMethods;
+      rawData.es_results = esMethods;
+    }
+
+    if (covHealthData) {
+      metrics['Condition Number'] = covHealthData.condition_number.toFixed(1);
+      metrics['LW Shrinkage'] = covHealthData.lw_shrinkage.toFixed(4);
+      metrics['Ill-conditioned'] = covHealthData.is_ill_conditioned ? 'YES' : 'No';
+      rawData.covariance_health = {
+        condition_number: covHealthData.condition_number.toFixed(2),
+        is_ill_conditioned: covHealthData.is_ill_conditioned,
+        lw_shrinkage: covHealthData.lw_shrinkage.toFixed(4),
+        oas_shrinkage: covHealthData.oas_shrinkage.toFixed(4),
+        n_assets: covHealthData.n_assets,
+        n_observations: covHealthData.n_obs,
+        top_eigenvalues: covHealthData.eigenvalues.slice(0, 5).map(v => v.toFixed(3)),
+      };
+    }
+
+    if (mstData) {
+      rawData.mst = {
+        n_nodes: mstData.nodes.length,
+        total_mst_distance: mstData.total_mst_distance?.toFixed(4),
+        most_connected: mstData.mst_edges.slice(0, 5).map(e => {
+          const a = mstData.nodes.find(n => n.id === e.from)?.label ?? e.from;
+          const b = mstData.nodes.find(n => n.id === e.to)?.label ?? e.to;
+          return `${a}-${b} (ρ=${e.correlation.toFixed(2)}, d=${e.distance.toFixed(3)})`;
+        }),
+      };
+    }
+
+    setWorkspaceContext({
+      menuId: 'risk',
+      summary: varData
+        ? `${labels.join(', ')} · VaR computed · ${(alpha * 100).toFixed(0)}% conf, ${horizonDays}-day horizon`
+        : `${labels.join(', ')} · Covariance analysis ready`,
+      metrics,
+      rawData,
+      suggestedQuestions: DEFAULT_SUGGESTED_QUESTIONS.risk,
+    });
+  }, [varData, covHealthData, mstData, labels, weights, portfolioValue, alpha, horizonDays, setWorkspaceContext]);
+}
+
 // ── Inner workspace ───────────────────────────────────────────────────────────
 function RiskWorkspaceInner() {
   const location = useLocation();
+  useRiskAgentSync();
 
   function getActiveTab() {
     if (location.pathname.includes('/greeks'))     return 'greeks';
@@ -245,7 +316,7 @@ function RiskWorkspaceInner() {
             {meta.badge}
           </span>
         </div>
-        <p className="text-sm text-slate-400 ml-9">{meta.desc}</p>
+        <p className="text-sm text-slate-400 ml-9"><MathText text={meta.desc} /></p>
       </div>
 
       {/* ── Data source panel ────────────────────────────────────────── */}

@@ -12,9 +12,11 @@
  *   /transact/factor/herding        → HerdingPanel      (crowding risk)
  *   /transact/factor/ml             → MLFactorPanel     (PCA discovery)
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { FactorProvider, useFactorContext } from '@/context/FactorContext';
+import { useAgentContext, DEFAULT_SUGGESTED_QUESTIONS } from '@/context/AgentContext';
+import { MathText } from '@/components/ui/Math';
 import { AssetSearchBar }    from '@/components/AssetSearchBar';
 import { FactorModelPanel }  from '@/components/FactorLab/FactorModelPanel';
 import { FamaMacBethPanel }  from '@/components/FactorLab/FamaMacBethPanel';
@@ -22,13 +24,62 @@ import { SmartBetaPanel }    from '@/components/FactorLab/SmartBetaPanel';
 import { HerdingPanel }      from '@/components/FactorLab/HerdingPanel';
 import { MLFactorPanel }     from '@/components/FactorLab/MLFactorPanel';
 
+// ── Agent context sync hook ────────────────────────────────────────────────────
+function useFactorAgentSync() {
+  const { setWorkspaceContext } = useAgentContext();
+  const { symbols, returnMatrix, factorModelResult, fmbResult, smartBetaResult, crowdingResult } = useFactorContext();
+
+  useEffect(() => {
+    const rawData: Record<string, unknown> = {};
+    const metrics: Record<string, string | number | null> = {
+      assets: symbols.join(', ') || 'none',
+      observations: returnMatrix.length,
+    };
+
+    if (factorModelResult) {
+      rawData.factor_model = factorModelResult;
+      const avgR2 = factorModelResult.r_squared.length > 0
+        ? factorModelResult.r_squared.reduce((a, b) => a + b, 0) / factorModelResult.r_squared.length
+        : null;
+      if (avgR2 !== null) metrics['avg_r_squared'] = avgR2.toFixed(3);
+    }
+    if (fmbResult) {
+      rawData.fama_macbeth = fmbResult;
+      metrics['fm_lambda_0'] = fmbResult.lambdas[0]?.toFixed(4) ?? null;
+    }
+    if (smartBetaResult) {
+      rawData.smart_beta = smartBetaResult;
+      metrics['sb_return'] = (smartBetaResult.expected_return * 100).toFixed(2) + '%';
+      metrics['sb_vol']    = (smartBetaResult.volatility * 100).toFixed(2) + '%';
+    }
+    if (crowdingResult) {
+      rawData.crowding = crowdingResult;
+      metrics['crowding_index'] = crowdingResult.crowding_index.toFixed(3);
+      metrics['crowding_level'] = crowdingResult.level;
+    }
+
+    const hasResults = factorModelResult || fmbResult || smartBetaResult || crowdingResult;
+    const summary = hasResults
+      ? `Factor Lab: ${symbols.length} assets — ${[factorModelResult && 'OLS', fmbResult && 'Fama-MacBeth', smartBetaResult && 'Smart Beta', crowdingResult && 'Crowding'].filter(Boolean).join(', ')} computed`
+      : `Factor Lab: ${symbols.length > 0 ? symbols.length + ' assets loaded' : 'no data loaded yet'}`;
+
+    setWorkspaceContext({
+      menuId: 'factor',
+      summary,
+      metrics,
+      suggestedQuestions: DEFAULT_SUGGESTED_QUESTIONS.factor,
+      ...(hasResults ? { rawData } : {}),
+    });
+  }, [symbols, returnMatrix, factorModelResult, fmbResult, smartBetaResult, crowdingResult, setWorkspaceContext]);
+}
+
 // ── Panel metadata ─────────────────────────────────────────────────────────────
 const PANEL_META: Record<string, { title: string; badge: string; desc: string }> = {
-  models:       { title: 'Factor Model Builder',    badge: 'M2 L4 · OLS',         desc: 'R_it = α_i + β_i^T f_t + ε_it · systematic vs idiosyncratic decomposition' },
-  fmb:          { title: 'Fama-MacBeth Regression', badge: 'M6 L1 · Two-Pass',    desc: 'Stage 1: time-series betas · Stage 2: cross-sectional risk premia λ̂' },
-  'smart-beta': { title: 'Smart Beta Construction', badge: 'M6 L2 · Momentum',    desc: 'Factor-tilted portfolios: quintile sort & signal-weighted on momentum' },
-  herding:      { title: 'Herding Risk Monitor',    badge: 'M6 L2 · Khandani-Lo', desc: 'Factor crowding index · 2007 Quant Meltdown context · pairwise |ρ|' },
-  ml:           { title: 'ML Factor Discovery',     badge: 'PCA · Latent',        desc: 'PCA on return matrix · scree plot · 80% variance rule · loadings heatmap' },
+  models:       { title: 'Factor Model Builder',    badge: 'M2 L4 · OLS',         desc: '$R_{it} = \\alpha_i + \\boldsymbol{\\beta}_i^\\top \\mathbf{f}_t + \\varepsilon_{it}$ · systematic vs idiosyncratic decomposition' },
+  fmb:          { title: 'Fama-MacBeth Regression', badge: 'M6 L1 · Two-Pass',    desc: 'Stage 1: time-series $\\hat{\\beta}_i$ · Stage 2: cross-sectional risk premia $\\hat{\\lambda}$ via $\\bar{r}_i = \\lambda_0 + \\hat{\\beta}_i^\\top\\lambda + \\alpha_i$' },
+  'smart-beta': { title: 'Smart Beta Construction', badge: 'M6 L2 · Momentum',    desc: 'Factor-tilted portfolios: quintile sort & signal-weighted on momentum $\\text{IC} = \\text{Corr}(\\text{signal}, r_{t+1})$' },
+  herding:      { title: 'Herding Risk Monitor',    badge: 'M6 L2 · Khandani-Lo', desc: 'Factor crowding index · 2007 Quant Meltdown · pairwise $|\\rho_{ij}|$ · herding $= \\frac{1}{N(N-1)}\\sum_{i \\neq j}|\\rho_{ij}|$' },
+  ml:           { title: 'ML Factor Discovery',     badge: 'PCA · Latent',        desc: 'PCA on return matrix $X \\approx U\\Sigma V^\\top$ · scree plot · 80% variance rule · loadings heatmap' },
 };
 
 // ── Shared Data Source Panel ─────────────────────────────────────────────────
@@ -139,6 +190,7 @@ function DataSourcePanel() {
 
 // ── Inner workspace ───────────────────────────────────────────────────────────
 function FactorWorkspaceInner() {
+  useFactorAgentSync();
   const location = useLocation();
 
   function getActiveTab() {
@@ -162,7 +214,7 @@ function FactorWorkspaceInner() {
             {meta.badge}
           </span>
         </div>
-        <p className="text-sm text-slate-400 ml-9">{meta.desc}</p>
+        <p className="text-sm text-slate-400 ml-9"><MathText text={meta.desc} /></p>
       </div>
 
       {/* Shared data source */}

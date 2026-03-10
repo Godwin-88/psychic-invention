@@ -5,6 +5,7 @@
  */
 import { useState, useEffect } from 'react';
 import { useOptimizer, type FrontierPoint } from '@/context/OptimizerContext';
+import { MathBlock } from '@/components/ui/Math';
 
 const pct = (v: number) => (v * 100).toFixed(2) + '%';
 const fmt2 = (v: number) => v.toFixed(4);
@@ -209,11 +210,14 @@ export const MVOPanel = () => {
       )}
 
       {/* Theory note */}
-      <div className="rounded-xl border border-slate-700 bg-slate-800/30 p-4 text-xs text-slate-500 space-y-1">
-        <p className="font-semibold text-slate-300">M1 L4 — Markowitz Mean-Variance Optimization</p>
-        <p>QP: min½w^TΣw s.t. w^Tμ=E[r], w^Tι=1, w≥0 (long-only). Solved via CVXPY.</p>
-        <p>GMV: w = Σ⁻¹ι / (ι^TΣ⁻¹ι). Tangency: w = Σ⁻¹(μ−r_fι) / (ι^TΣ⁻¹(μ−r_fι)).</p>
-        <p>Two-fund separation: any frontier portfolio = αw_GMV + (1−α)w_Tang. CAL slope = Sharpe(w_Tang).</p>
+      <div className="rounded-xl border border-slate-700 bg-slate-800/30 p-4 space-y-3">
+        <p className="text-xs font-semibold text-slate-300">M1 L4 — Markowitz Mean-Variance Optimization</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 overflow-x-auto">
+          <MathBlock latex="\min_w \tfrac{1}{2}\mathbf{w}^\top\Sigma\mathbf{w} \;\text{ s.t. }\; \mathbf{w}^\top\boldsymbol{\mu}=E[r],\; \mathbf{w}^\top\iota=1,\; w\ge0" />
+          <MathBlock latex="w_{\mathrm{GMV}} = \frac{\Sigma^{-1}\iota}{\iota^\top\Sigma^{-1}\iota} \qquad w_{\mathrm{Tang}} = \frac{\Sigma^{-1}(\boldsymbol{\mu}-r_f\iota)}{\iota^\top\Sigma^{-1}(\boldsymbol{\mu}-r_f\iota)}" />
+          <MathBlock latex="\text{Two-fund: } w^* = \alpha\, w_{\mathrm{GMV}} + (1-\alpha)\,w_{\mathrm{Tang}}" />
+          <MathBlock latex="\text{CAL slope} = \mathrm{Sharpe}(w_{\mathrm{Tang}}) = \frac{E[r_T]-r_f}{\sigma_T}" />
+        </div>
       </div>
     </div>
   );

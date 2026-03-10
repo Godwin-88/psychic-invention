@@ -39,6 +39,16 @@ ASSET_TYPE_LABELS = {
 }
 
 
+@router.get("/providers")
+def get_data_providers() -> List[str]:
+    """Return available data providers for history, quote, and options (yfinance, openbb, nautilus)."""
+    try:
+        from app.assets.providers import VALID_PROVIDERS
+        return list(VALID_PROVIDERS)
+    except ImportError:
+        return ["yfinance", "openbb", "nautilus"]
+
+
 @router.get("/types")
 def get_asset_types() -> List[dict]:
     """
@@ -123,83 +133,256 @@ def search_assets(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ── Market Movers ─────────────────────────────────────────────────────────────
+
+# Per-category watchlists — broad cross-asset coverage for the ticker
+_MOVERS_BY_CATEGORY: dict[str, dict] = {
+    "equities": {
+        "label": "Equities",
+        "color": "blue",
+        "symbols": [
+            "AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA", "JPM",
+            "GS", "BAC", "XOM", "CVX", "UNH", "JNJ", "V", "MA", "WMT", "HD",
+            "PG", "KO", "NFLX", "ADBE", "AMD", "INTC", "ORCL", "CRM", "PYPL",
+            "DIS", "NKE", "PFE",
+        ],
+    },
+    "etfs": {
+        "label": "ETFs",
+        "color": "indigo",
+        "symbols": [
+            "SPY", "QQQ", "IWM", "DIA", "VTI", "VOO", "GLD", "SLV", "TLT",
+            "XLF", "XLK", "XLE", "XLV", "XLI", "XLY", "ARKK", "ARKG", "HYG",
+            "LQD", "EEM",
+        ],
+    },
+    "indices": {
+        "label": "Indices",
+        "color": "violet",
+        "symbols": [
+            "^GSPC", "^IXIC", "^DJI", "^RUT", "^FTSE", "^N225", "^HSI",
+            "^DAX", "^CAC40", "^STOXX50E", "^AXJO", "^BSESN",
+        ],
+    },
+    "crypto": {
+        "label": "Crypto",
+        "color": "orange",
+        "symbols": [
+            "BTC-USD", "ETH-USD", "SOL-USD", "BNB-USD", "XRP-USD", "ADA-USD",
+            "AVAX-USD", "DOT-USD", "DOGE-USD", "MATIC-USD", "LINK-USD",
+            "LTC-USD", "ATOM-USD", "UNI-USD", "NEAR-USD",
+        ],
+    },
+    "forex": {
+        "label": "Forex",
+        "color": "teal",
+        "symbols": [
+            "EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X",
+            "USDCHF=X", "NZDUSD=X", "EURGBP=X", "USDINR=X", "USDCNY=X",
+            "USDMXN=X", "USDBRL=X",
+        ],
+    },
+    "futures": {
+        "label": "Futures",
+        "color": "amber",
+        "symbols": [
+            "CL=F", "BZ=F", "GC=F", "SI=F", "HG=F", "NG=F",
+            "ZC=F", "ZW=F", "ZS=F", "KC=F", "SB=F", "CT=F",
+        ],
+    },
+    "volatility": {
+        "label": "Volatility",
+        "color": "red",
+        "symbols": [
+            "^VIX", "^VVIX", "^VXN", "^OVX", "^GVZ", "^SKEW",
+        ],
+    },
+    "mutualfunds": {
+        "label": "Mutual Funds",
+        "color": "emerald",
+        "symbols": [
+            "VFINX", "FXAIX", "VTSAX", "FCNTX", "AGTHX", "DODGX",
+            "PRGFX", "VTSMX",
+        ],
+    },
+}
+
+# Human-readable labels for non-obvious symbols
+_DISPLAY_NAMES: dict[str, str] = {
+    "^GSPC": "S&P 500", "^IXIC": "NASDAQ", "^DJI": "Dow Jones",
+    "^RUT": "Russell 2000", "^FTSE": "FTSE 100", "^N225": "Nikkei 225",
+    "^HSI": "Hang Seng", "^DAX": "DAX", "^CAC40": "CAC 40",
+    "^STOXX50E": "Euro Stoxx 50", "^AXJO": "ASX 200", "^BSESN": "Sensex",
+    "^VIX": "VIX", "^VVIX": "VVIX", "^VXN": "VXN (NASDAQ Vol)",
+    "^OVX": "OVX (Oil Vol)", "^GVZ": "GVZ (Gold Vol)", "^SKEW": "SKEW",
+    "CL=F": "WTI Crude", "BZ=F": "Brent Crude", "GC=F": "Gold",
+    "SI=F": "Silver", "HG=F": "Copper", "NG=F": "Nat Gas",
+    "ZC=F": "Corn", "ZW=F": "Wheat", "ZS=F": "Soybeans",
+    "KC=F": "Coffee", "SB=F": "Sugar", "CT=F": "Cotton",
+    "EURUSD=X": "EUR/USD", "GBPUSD=X": "GBP/USD", "USDJPY=X": "USD/JPY",
+    "AUDUSD=X": "AUD/USD", "USDCAD=X": "USD/CAD", "USDCHF=X": "USD/CHF",
+    "NZDUSD=X": "NZD/USD", "EURGBP=X": "EUR/GBP", "USDINR=X": "USD/INR",
+    "USDCNY=X": "USD/CNY", "USDMXN=X": "USD/MXN", "USDBRL=X": "USD/BRL",
+}
+
+# Module-level cache — avoid repeated slow batch downloads
+import time as _time
+_movers_cache: dict = {"data": None, "ts": 0.0}
+_MOVERS_CACHE_TTL = 300  # 5 minutes
+
+
+def _ticker_label(sym: str) -> str:
+    if sym in _DISPLAY_NAMES:
+        return _DISPLAY_NAMES[sym]
+    return sym.replace("=X", "").replace("-USD", "/USD").replace("^", "")
+
+
+@router.get("/movers")
+def get_market_movers(top: int = Query(5, ge=2, le=10)) -> dict:
+    """
+    Return top gainers and top losers per asset class (equities, ETFs, indices,
+    crypto, forex, futures, volatility, mutual funds). Cached in-process for 5 min.
+    """
+    global _movers_cache
+
+    # Return cached result if fresh
+    now = _time.time()
+    if _movers_cache["data"] is not None and (now - _movers_cache["ts"]) < _MOVERS_CACHE_TTL:
+        return _movers_cache["data"]
+
+    try:
+        import yfinance as yf
+        import numpy as np
+
+        # Collect all symbols from all categories
+        all_symbols: list[str] = []
+        for cat in _MOVERS_BY_CATEGORY.values():
+            all_symbols.extend(cat["symbols"])
+
+        # Single batch download for all symbols
+        raw = yf.download(
+            all_symbols,
+            period="2d",
+            interval="1d",
+            auto_adjust=True,
+            progress=False,
+            threads=True,
+        )
+
+        if raw.empty:
+            return {"categories": {}, "timestamp": ""}
+
+        # Handle multi-level or single-level columns
+        if isinstance(raw.columns, type(raw.columns)) and hasattr(raw.columns, "levels"):
+            try:
+                close = raw.xs("Close", axis=1, level=0)
+            except Exception:
+                close = raw["Close"] if "Close" in raw.columns else raw
+        else:
+            close = raw["Close"] if "Close" in raw.columns else raw
+
+        if close.shape[0] < 2:
+            return {"categories": {}, "timestamp": ""}
+
+        prev = close.iloc[-2]
+        curr = close.iloc[-1]
+        pct  = ((curr - prev) / prev * 100)
+
+        # Build per-category results
+        categories: dict = {}
+        for cat_id, cat_meta in _MOVERS_BY_CATEGORY.items():
+            cat_results = []
+            for sym in cat_meta["symbols"]:
+                if sym not in pct.index:
+                    continue
+                try:
+                    change = float(pct[sym])
+                    price  = float(curr[sym])
+                except Exception:
+                    continue
+                if np.isnan(change) or np.isnan(price):
+                    continue
+                if not (abs(change) < 1000 and price > 0):
+                    continue
+                cat_results.append({
+                    "symbol":     sym,
+                    "label":      _ticker_label(sym),
+                    "price":      round(price, 4),
+                    "change_pct": round(change, 2),
+                })
+
+            if not cat_results:
+                continue
+
+            cat_results.sort(key=lambda x: x["change_pct"], reverse=True)
+            categories[cat_id] = {
+                "label":   cat_meta["label"],
+                "color":   cat_meta["color"],
+                "gainers": cat_results[:top],
+                "losers":  list(reversed(cat_results[-top:])),
+            }
+
+        from datetime import datetime, timezone
+        ts = datetime.now(timezone.utc).strftime("%H:%M UTC")
+        result = {"categories": categories, "timestamp": ts}
+
+        _movers_cache["data"] = result
+        _movers_cache["ts"]   = now
+        return result
+
+    except ImportError:
+        raise HTTPException(status_code=503, detail="yfinance required for market movers")
+    except Exception as e:
+        logger.exception("Market movers failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 YF_PERIODS = ("1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y", "ytd")
+
+try:
+    from app.assets.providers import VALID_PROVIDERS, get_asset_history_by_provider
+except ImportError:
+    VALID_PROVIDERS = ("yfinance", "openbb", "nautilus")
+    get_asset_history_by_provider = None
 
 
 @router.get("/history")
 def get_asset_history(
     symbol: str = Query(..., min_length=1, description="Asset symbol (e.g. AAPL, BTC-USD)"),
     period: str = Query("1mo", description="Period: 1d, 5d, 1mo, 3mo, 6mo, 1y, ytd"),
+    provider: str = Query("yfinance", description="Data source: yfinance, openbb, nautilus"),
 ) -> List[dict]:
     """
-    Fetch OHLC historical data via yfinance for charting.
+    Fetch OHLC historical data for charting. Provider: yfinance | openbb | nautilus.
     """
     if period not in YF_PERIODS:
         raise HTTPException(status_code=400, detail=f"Invalid period. Use one of: {', '.join(YF_PERIODS)}")
-
+    if get_asset_history_by_provider is None:
+        raise HTTPException(status_code=503, detail="Asset providers not available")
     try:
-        import yfinance as yf
-        ticker = yf.Ticker(symbol.strip())
-        df = ticker.history(period=period)
-
-        if df is None or df.empty:
-            return []
-
-        import math
-        out = []
-        for ts, row in df.iterrows():
-            def _num(v):
-                try:
-                    f = float(v)
-                    return None if math.isnan(f) else f
-                except (TypeError, ValueError):
-                    return None
-            out.append({
-                "date": ts.strftime("%Y-%m-%d") if hasattr(ts, "strftime") else str(ts),
-                "open": _num(row.get("Open")),
-                "high": _num(row.get("High")),
-                "low": _num(row.get("Low")),
-                "close": _num(row.get("Close")),
-                "volume": _num(row.get("Volume")),
-            })
-        return out
-
-    except ImportError:
-        logger.error("yfinance not installed")
-        raise HTTPException(status_code=503, detail="History requires yfinance")
+        return get_asset_history_by_provider(symbol, period, provider or "yfinance")
     except Exception as e:
         logger.exception("Asset history failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/quote/{symbol}")
-def get_asset_quote(symbol: str) -> dict:
+def get_asset_quote(
+    symbol: str,
+    provider: str = Query("yfinance", description="Data source: yfinance, openbb, nautilus"),
+) -> dict:
     """
-    Fetch current spot price, name, and currency for a symbol via yfinance.
+    Fetch current spot price, name, and currency. Provider: yfinance | openbb | nautilus.
     """
     try:
-        import yfinance as yf
-        ticker = yf.Ticker(symbol.strip().upper())
-        info = ticker.info or {}
-        spot = (
-            info.get("regularMarketPrice")
-            or info.get("currentPrice")
-            or info.get("previousClose")
-        )
-        if spot is None:
-            hist = ticker.history(period="1d")
-            spot = float(hist["Close"].iloc[-1]) if not hist.empty else None
-        if spot is None:
-            raise HTTPException(status_code=404, detail=f"No price found for {symbol}")
-        return {
-            "symbol": symbol.upper(),
-            "spot": float(spot),
-            "name": info.get("shortName", symbol),
-            "currency": info.get("currency", "USD"),
-        }
+        from app.assets.providers import get_asset_quote_by_provider
+        return get_asset_quote_by_provider(symbol, provider or "yfinance")
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except HTTPException:
         raise
     except Exception as e:
+        logger.exception("Asset quote failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -208,97 +391,17 @@ def get_asset_options(
     symbol: str,
     n_expiries: int = Query(3, ge=1, le=6, description="Number of nearest expiries to include"),
     moneyness_range: float = Query(0.20, ge=0.05, le=0.50, description="Strike range around ATM as fraction"),
+    provider: str = Query("yfinance", description="Data source: yfinance, openbb, nautilus"),
 ) -> dict:
     """
-    Fetch real option chain data from yfinance for Heston calibration.
+    Fetch option chain for Heston calibration. Provider: yfinance | openbb | nautilus.
     Returns call options (strike, expiry_years, mid_price, implied_vol) near ATM.
     """
     try:
-        import yfinance as yf
-        import math
-        from datetime import date as date_cls
-
-        ticker = yf.Ticker(symbol.strip().upper())
-
-        # Current spot price
-        info = ticker.info or {}
-        spot = (
-            info.get("regularMarketPrice")
-            or info.get("currentPrice")
-            or info.get("previousClose")
-        )
-        if spot is None:
-            hist = ticker.history(period="1d")
-            spot = float(hist["Close"].iloc[-1]) if not hist.empty else None
-        if spot is None:
-            raise HTTPException(status_code=404, detail=f"No spot price for {symbol}")
-        spot = float(spot)
-
-        # Available expiries
-        expirations = ticker.options
-        if not expirations:
-            raise HTTPException(status_code=404, detail=f"No options data for {symbol}")
-
-        today = date_cls.today()
-        options_out = []
-
-        for exp_str in expirations[:n_expiries]:
-            try:
-                exp_date = date_cls.fromisoformat(exp_str)
-                tau = (exp_date - today).days / 365.0
-                if tau <= 0.01:
-                    continue
-
-                chain = ticker.option_chain(exp_str)
-                calls = chain.calls
-
-                if calls is None or calls.empty:
-                    continue
-
-                # Filter strikes within moneyness_range of spot
-                lo = spot * (1 - moneyness_range)
-                hi = spot * (1 + moneyness_range)
-                calls = calls[(calls["strike"] >= lo) & (calls["strike"] <= hi)]
-
-                for _, row in calls.iterrows():
-                    strike = float(row["strike"])
-                    bid = float(row.get("bid", 0) or 0)
-                    ask = float(row.get("ask", 0) or 0)
-                    last = float(row.get("lastPrice", 0) or 0)
-                    iv = float(row.get("impliedVolatility", 0) or 0)
-
-                    # Use bid/ask mid if valid, else lastPrice
-                    if bid > 0 and ask > 0:
-                        mid = (bid + ask) / 2
-                    elif last > 0:
-                        mid = last
-                    else:
-                        continue
-
-                    if mid <= 0 or math.isnan(mid) or math.isnan(iv):
-                        continue
-
-                    options_out.append({
-                        "strike": round(strike, 2),
-                        "expiry": round(tau, 4),
-                        "expiry_str": exp_str,
-                        "price": round(mid, 4),
-                        "implied_vol": round(iv, 4),
-                        "moneyness": round(strike / spot, 4),
-                    })
-            except Exception:
-                continue
-
-        if not options_out:
-            raise HTTPException(status_code=404, detail=f"No valid options data found for {symbol}")
-
-        return {
-            "symbol": symbol.upper(),
-            "spot": spot,
-            "n_contracts": len(options_out),
-            "contracts": options_out,
-        }
-
+        from app.assets.providers import get_asset_options_by_provider
+        return get_asset_options_by_provider(symbol, provider or "yfinance", n_expiries, moneyness_range)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except HTTPException:
         raise
     except ImportError:

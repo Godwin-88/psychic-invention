@@ -120,11 +120,12 @@ export const menuItems: MenuItem[] = [
     label: 'Blotter',
     path: '/transact/blotter',
     subItems: [
-      { id: 'entry',       label: 'Trade Entry',         path: '/transact/blotter' },
-      { id: 'positions',   label: 'Position Monitor',    path: '/transact/blotter/positions' },
-      { id: 'attribution', label: 'P&L Attribution',     path: '/transact/blotter/attribution' },
-      { id: 'history',     label: 'Transaction History', path: '/transact/blotter/history' },
-      { id: 'export',      label: 'Export',              path: '/transact/blotter/export' },
+      { id: 'overview',    label: 'Chart Area (Overview)', path: '/transact/blotter' },
+      { id: 'entry',       label: 'Trade Entry',           path: '/transact/blotter/entry' },
+      { id: 'positions',   label: 'Position Monitor',      path: '/transact/blotter/positions' },
+      { id: 'attribution', label: 'P&L Attribution',      path: '/transact/blotter/attribution' },
+      { id: 'history',     label: 'Transaction History',  path: '/transact/blotter/history' },
+      { id: 'export',      label: 'Export',               path: '/transact/blotter/export' },
     ],
   },
   {

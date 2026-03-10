@@ -7,6 +7,7 @@
  */
 import { useState } from 'react';
 import { useOptimizer } from '@/context/OptimizerContext';
+import { MathText } from '@/components/ui/Math';
 
 const pct  = (v: number) => (v * 100).toFixed(1) + '%';
 const pct2 = (v: number) => (v * 100).toFixed(2) + '%';
@@ -336,9 +337,9 @@ export const ComparisonPanel = () => {
       {/* Theory note */}
       <div className="rounded-xl border border-slate-700 bg-slate-800/30 p-4 text-xs text-slate-500 space-y-1">
         <p className="font-semibold text-slate-300">Strategy Comparison — M1 L4 · M3 L1 · M5 L1,L3 · M7 L4</p>
-        <p>MVO Tangency: max Sharpe on mean-variance frontier. BLM: equilibrium + views. Risk Parity: ERC (ρ=0).</p>
-        <p>HRP: correlation-distance clustering + recursive bisection (no matrix inversion). Kelly: max E[ln W].</p>
-        <p>HHI = Σw_i² (Herfindahl-Hirschman concentration index); 1/N = perfectly diversified, 1 = fully concentrated.</p>
+        <p><MathText text="MVO Tangency: max Sharpe on mean-variance frontier. BLM: equilibrium $\pi +$ views. Risk Parity: ERC ($\rho=0$)." /></p>
+        <p><MathText text="HRP: Mantegna clustering + recursive bisection (no $\Sigma^{-1}$). Kelly: $\max\,\mathbb{E}[\ln W]$." /></p>
+        <p><MathText text="$\text{HHI} = \sum_i w_i^2$ (Herfindahl-Hirschman index); $1/N$ = perfectly diversified, $1$ = fully concentrated." /></p>
       </div>
     </div>
   );

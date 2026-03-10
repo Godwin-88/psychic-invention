@@ -16,6 +16,14 @@ from .optimizer.hrp import hrp_weights
 from .optimizer.kelly import kelly_single, kelly_growth_curve, kelly_multi_asset
 from .blotter.trade_store import get_trade_store
 from .blotter.attribution import performance_attribution
+from .blotter.chart_data import get_chart_bars, list_instruments
+from .blotter.db_blotter import (
+    use_db_blotter,
+    ensure_db_init,
+    add_trade as db_add_trade,
+    get_trades_from_db,
+    get_positions_from_db,
+)
 from .scenarios.scenario_engine import apply_custom_scenario, probabilistic_scenario_optimization, CRISIS_PERIODS
 from .scenarios.monte_carlo import monte_carlo_portfolio
 from .scenarios.behavioral import portfolio_perceived_utility, herding_stress_var
@@ -659,13 +667,13 @@ def post_heston_calibrate(req: HestonCalibrateRequest):
             np.array(req.strikes), np.array(req.expiries), np.array(req.market_prices),
         )
         return {
-            "v0": res.v0,
-            "kappa": res.kappa,
-            "theta": res.theta,
-            "xi": res.xi,
-            "rho": res.rho,
-            "rmse": res.rmse,
-            "feller_condition_ok": res.feller_ok,
+            "v0": float(res.v0),
+            "kappa": float(res.kappa),
+            "theta": float(res.theta),
+            "xi": float(res.xi),
+            "rho": float(res.rho),
+            "rmse": float(res.rmse),
+            "feller_condition_ok": bool(res.feller_ok),
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -686,7 +694,7 @@ def post_vol_implied_surface(req: ImpliedSurfaceRequest):
         ivs = []
         for i in range(len(req.strikes)):
             iv = implied_vol_bs(req.market_prices[i], req.s, req.strikes[i], req.r, req.expiries[i], "call")
-            ivs.append({"strike": req.strikes[i], "expiry": req.expiries[i], "iv": iv})
+            ivs.append({"strike": float(req.strikes[i]), "expiry": float(req.expiries[i]), "iv": float(iv)})
         return {"surface": ivs}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -912,7 +920,34 @@ def post_factors_pca(req: PCARequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-# --- Blotter ---
+# --- Blotter (Menu 8: Chart Area data from Nautilus; fallback yfinance) ---
+@router.get("/blotter/chart/bars")
+def get_blotter_chart_bars(
+    symbol: Optional[str] = None,
+    timeframe: Optional[str] = "1d",
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+):
+    """OHLCV bars for Chart Area. Source: Nautilus when configured, else yfinance (same as /assets/history)."""
+    try:
+        sym = (symbol or "").strip()
+        bars = get_chart_bars(symbol=sym, timeframe=timeframe or "1d", from_date=from_date, to_date=to_date)
+        return {"symbol": sym, "timeframe": timeframe or "1d", "bars": bars}
+    except Exception as e:
+        return {"symbol": symbol or "", "timeframe": timeframe or "1d", "bars": [], "error": str(e)}
+
+
+@router.get("/blotter/instruments")
+def get_blotter_instruments(asset_type: Optional[str] = "equity"):
+    """Instruments by asset type for Chart Area selector. Source: Nautilus when configured."""
+    try:
+        instruments = list_instruments(asset_type or "equity")
+        return {"asset_type": asset_type or "equity", "instruments": instruments}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# --- Blotter: Trade Entry, Positions, History ---
 class TradeEntryRequest(BaseModel):
     asset: str
     direction: str  # "long" | "short"
@@ -931,10 +966,24 @@ class PositionsRequest(BaseModel):
 
 @router.post("/blotter/trade")
 def post_blotter_trade(req: TradeEntryRequest):
-    """Add a new trade."""
+    """Add a new trade. Persists to Postgres + double-entry ledger when DATABASE_URL is set."""
     try:
         if req.direction.lower() not in ("long", "short"):
             raise HTTPException(status_code=400, detail="direction must be 'long' or 'short'")
+        if use_db_blotter():
+            result = db_add_trade(
+                asset=req.asset,
+                direction=req.direction,
+                quantity=req.quantity,
+                entry_price=req.entry_price,
+                entry_date=req.entry_date,
+                model_used=req.model_used,
+                theoretical_price=req.theoretical_price,
+                strategy_tag=req.strategy_tag,
+                asset_class=req.asset_class,
+            )
+            if result:
+                return result
         store = get_trade_store()
         trade = store.add_trade(
             asset=req.asset,
@@ -963,12 +1012,16 @@ def post_blotter_trade(req: TradeEntryRequest):
 
 @router.get("/blotter/positions")
 def get_blotter_positions(current_prices: Optional[str] = None):
-    """Get open positions with P&L. Pass current_prices as JSON string or query param."""
+    """Get open positions with P&L. Uses DB when DATABASE_URL is set."""
     try:
         import json
         prices = json.loads(current_prices) if current_prices else {}
+        prices_dict = prices if isinstance(prices, dict) else {}
+        if use_db_blotter():
+            positions = get_positions_from_db(prices_dict)
+            return {"positions": positions}
         store = get_trade_store()
-        positions = store.get_positions(prices)
+        positions = store.get_positions(prices_dict)
         return {
             "positions": [
                 {
@@ -989,8 +1042,11 @@ def get_blotter_positions(current_prices: Optional[str] = None):
 
 @router.post("/blotter/positions")
 def post_blotter_positions(req: PositionsRequest):
-    """Get positions with P&L given current prices."""
+    """Get positions with P&L given current prices. Uses DB when DATABASE_URL is set."""
     try:
+        if use_db_blotter():
+            positions = get_positions_from_db(req.current_prices)
+            return {"positions": positions}
         store = get_trade_store()
         positions = store.get_positions(req.current_prices)
         return {
@@ -1011,11 +1067,45 @@ def post_blotter_positions(req: PositionsRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/blotter/history")
-def get_blotter_history():
-    """Full transaction history."""
+@router.get("/blotter/journal")
+def get_blotter_journal(
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    limit: Optional[int] = 500,
+):
+    """List journal entries with lines (double-entry ledger). Requires DATABASE_URL."""
     try:
+        entries = get_journal(from_date=from_date, to_date=to_date, limit=limit or 500)
+        return {"entries": entries}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/blotter/accounts")
+def get_blotter_accounts(as_of_date: Optional[str] = None):
+    """List accounts with balances (trial balance). Requires DATABASE_URL."""
+    try:
+        balances = get_accounts_balances(as_of_date=as_of_date)
+        return {"accounts": balances}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/blotter/history")
+def get_blotter_history(
+    asset: Optional[str] = None,
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+):
+    """Full transaction history. Uses DB when DATABASE_URL is set."""
+    try:
+        if use_db_blotter():
+            trades = get_trades_from_db(asset=asset, from_date=from_date, to_date=to_date)
+            return {"trades": trades}
         store = get_trade_store()
+        if asset or from_date or to_date:
+            trade_list = store.get_trades(asset=asset, from_date=from_date, to_date=to_date)
+            return {"trades": [{"id": t.id, "asset": t.asset, "direction": t.direction, "quantity": t.quantity, "entry_price": t.entry_price, "entry_date": t.entry_date, "model_used": t.model_used, "theoretical_price_at_entry": t.theoretical_price_at_entry, "strategy_tag": t.strategy_tag} for t in trade_list]}
         return {"trades": store.get_history()}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -1179,6 +1269,69 @@ def post_scenarios_behavioral(req: BehavioralRequest):
         else:
             util = portfolio_perceived_utility(returns, weights)
             return {"perceived_utility": util}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/blotter/context")
+def get_blotter_context():
+    """
+    Aggregated blotter context for the AI agent.
+    Returns positions, trade summary, P&L stats, available instruments,
+    and attribution metadata in a single lightweight payload.
+    """
+    try:
+        store = get_trade_store()
+        positions_raw = store.get_positions({})
+        trades_raw = store.get_history() if hasattr(store, 'get_history') else []
+
+        positions = []
+        total_pnl = 0.0
+        total_value = 0.0
+        for p in positions_raw:
+            pnl = float(getattr(p, 'unrealized_pnl', 0) or 0)
+            mv = float(getattr(p, 'market_value', 0) or (
+                float(getattr(p, 'quantity', 0)) * float(getattr(p, 'current_price', 0))
+            ))
+            total_pnl += pnl
+            total_value += mv
+            positions.append({
+                "symbol": getattr(p, 'asset', ''),
+                "quantity": getattr(p, 'quantity', 0),
+                "direction": getattr(p, 'direction', 'long'),
+                "entry_price": getattr(p, 'entry_price', 0),
+                "current_price": getattr(p, 'current_price', 0),
+                "unrealized_pnl": pnl,
+                "unrealized_pnl_pct": float(getattr(p, 'unrealized_pnl_pct', 0) or 0),
+                "market_value": mv,
+            })
+
+        # P&L breakdown by direction
+        long_positions = [p for p in positions if p['direction'] == 'long']
+        short_positions = [p for p in positions if p['direction'] == 'short']
+        winners = [p for p in positions if p['unrealized_pnl'] > 0]
+        losers  = [p for p in positions if p['unrealized_pnl'] < 0]
+
+        # Available instruments from chart data
+        try:
+            instruments = list_instruments()
+        except Exception:
+            instruments = []
+
+        return {
+            "positions": positions,
+            "position_count": len(positions),
+            "long_count": len(long_positions),
+            "short_count": len(short_positions),
+            "total_unrealized_pnl": round(total_pnl, 2),
+            "total_market_value": round(total_value, 2),
+            "winner_count": len(winners),
+            "loser_count": len(losers),
+            "win_rate_pct": round(len(winners) / len(positions) * 100, 1) if positions else 0.0,
+            "trade_count": len(trades_raw) if isinstance(trades_raw, list) else 0,
+            "available_instruments": instruments[:20],
+            "attribution_available": len(positions) >= 2,
+        }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

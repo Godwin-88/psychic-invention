@@ -18,6 +18,7 @@
  */
 import { useState, useMemo } from 'react';
 import { useScenariosContext } from '@/context/ScenariosContext';
+import { MathText } from '@/components/ui/Math';
 
 const pct = (v: number) => (v * 100).toFixed(2) + '%';
 const fmt3 = (v: number) => v.toFixed(3);
@@ -353,10 +354,10 @@ export const CovStressPanel = () => {
       {/* Theory */}
       <div className="rounded-xl border border-slate-700 bg-slate-800/30 p-4 text-xs text-slate-500 space-y-1">
         <p className="font-semibold text-slate-300">Covariance Stress Testing (M7)</p>
-        <p>{'Σ_stressed = D_stressed · clip(ρ + Δρ, −0.99, 0.99) · D_stressed'}</p>
-        <p>{'D_stressed = diag(σ_i · mult) — scaled volatility diagonal matrix.'}</p>
-        <p>{'σ²_p_stressed = w^T Σ_stressed w — stressed portfolio variance.'}</p>
-        <p>Ledoit-Wolf shrinkage (M7): Σ_LW = (1−δ)·S + δ·μ̄·I — reduces estimation error for small T/N.</p>
+        <p><MathText text="$\Sigma_{\text{stressed}} = D_{\text{stressed}} \cdot \mathrm{clip}(\rho + \Delta\rho,\,-0.99,\,0.99) \cdot D_{\text{stressed}}$" /></p>
+        <p><MathText text="$D_{\text{stressed}} = \mathrm{diag}(\sigma_i \cdot \text{mult})$ — scaled volatility diagonal matrix." /></p>
+        <p><MathText text="$\sigma^2_{p,\text{stressed}} = w^\top\Sigma_{\text{stressed}}\,w$ — stressed portfolio variance." /></p>
+        <p><MathText text="Ledoit-Wolf (M7): $\Sigma_{\mathrm{LW}} = (1-\delta)S + \delta\bar{\mu}I$ — reduces estimation error for small $T/N$." /></p>
         <p>OAS (Oracle Approximating Shrinkage): data-driven δ estimate, generally more accurate than LW.</p>
       </div>
     </div>

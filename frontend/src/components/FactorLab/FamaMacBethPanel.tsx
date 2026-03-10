@@ -7,6 +7,7 @@
  * Inference: λ̂ = mean(λ̂_t), SE = std(λ̂_t)/√T, t = λ̂/SE
  */
 import { useFactorContext } from '@/context/FactorContext';
+import { MathText } from '@/components/ui/Math';
 
 const pct = (v: number) => (v * 100).toFixed(3) + '%';
 const fmt4 = (v: number) => v.toFixed(4);
@@ -261,10 +262,10 @@ export const FamaMacBethPanel = () => {
       {/* Theory */}
       <div className="rounded-xl border border-slate-700 bg-slate-800/30 p-4 text-xs text-slate-500 space-y-1">
         <p className="font-semibold text-slate-300">Fama-MacBeth Regression (M6 L1)</p>
-        <p>Stage 1 — Time-series OLS: R_it = α_i + β_i^T f_t + ε_it → β̂_i per asset.</p>
-        <p>Stage 2 — Cross-section: R_t = λ_0 + β̂^T λ + η_t each period t → λ̂_t.</p>
-        <p>{'λ̂_k = mean(λ̂_{k,t}), SE(λ̂_k) = std(λ̂_{k,t})/√T (Fama-MacBeth standard errors).'}</p>
-        <p>Positive λ_market = investors demand compensation for bearing market risk.</p>
+        <p><MathText text="Stage 1 — Time-series OLS: $R_{it} = \alpha_i + \boldsymbol{\beta}_i^\top \mathbf{f}_t + \varepsilon_{it}$ → $\hat{\boldsymbol{\beta}}_i$ per asset." /></p>
+        <p><MathText text="Stage 2 — Cross-section: $\bar{r}_i = \lambda_0 + \hat{\boldsymbol{\beta}}_i^\top\boldsymbol{\lambda} + \alpha_i$ each period $t$ → $\hat{\boldsymbol{\lambda}}_t$." /></p>
+        <p><MathText text="$\hat{\lambda}_k = \overline{\hat{\lambda}_{k,t}}$, $\;\mathrm{SE}(\hat{\lambda}_k) = \mathrm{std}(\hat{\lambda}_{k,t})/\sqrt{T}$ (Fama-MacBeth standard errors)." /></p>
+        <p><MathText text="Positive $\lambda_{\text{market}}$ = investors demand compensation for bearing market risk." /></p>
       </div>
     </div>
   );

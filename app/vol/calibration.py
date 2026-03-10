@@ -62,8 +62,12 @@ def heston_calibrate(
     x0 = [0.04, 2.0, 0.04, 0.3, -0.5]
     bounds = [(0.001, 1), (0.1, 10), (0.001, 1), (0.01, 2), (-0.99, 0.99)]
     res = minimize(obj, x0, method="L-BFGS-B", bounds=bounds)
-    v0, kappa, theta, xi, rho = res.x[0], res.x[1], res.x[2], res.x[3], np.clip(res.x[4], -0.99, 0.99)
-    feller = 2 * kappa * theta > xi * xi
+    v0    = float(res.x[0])
+    kappa = float(res.x[1])
+    theta = float(res.x[2])
+    xi    = float(res.x[3])
+    rho   = float(np.clip(res.x[4], -0.99, 0.99))
+    feller = bool(2 * kappa * theta > xi * xi)
     return HestonCalibResult(v0=v0, kappa=kappa, theta=theta, xi=xi, rho=rho, rmse=float(res.fun), feller_ok=feller)
 
 
@@ -85,7 +89,7 @@ def implied_vol_bs(c: float, s: float, k: float, r: float, tau: float, option_ty
     for _ in range(50):
         f = bs_call(sig) - price
         if abs(f) < 1e-8:
-            return sig
+            return float(sig)
         sig = sig - f / vega(sig)
-        sig = np.clip(sig, 0.01, 5.0)
-    return sig
+        sig = float(np.clip(sig, 0.01, 5.0))
+    return float(sig)

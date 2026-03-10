@@ -3,7 +3,7 @@
  * M1 Part II §4–7: Sharpe, Treynor, Sortino, M², M²-Sortino, IR, Appraisal Ratio
  */
 import { usePortfolio, type PerformanceData } from '@/context/PortfolioContext';
-import { MathBlock } from '@/components/ui/Math';
+import { MathBlock, MathText } from '@/components/ui/Math';
 
 // ── Ratio card ─────────────────────────────────────────────────────────────
 
@@ -21,7 +21,7 @@ const RATIO_CONFIGS: RatioConfig[] = [
   {
     key: 'sharpe_ratio',
     label: 'Sharpe Ratio',
-    formula: 'SR = (r̄_p − r̄_f) / σ_p',
+    formula: '$SR = (\\bar{r}_p - r_f) / \\sigma_p$',
     interpretation: v => v > 1 ? 'Excellent (> 1.0)' : v > 0.5 ? 'Good (0.5–1.0)' : v > 0 ? 'Marginal (0–0.5)' : 'Negative — underperforms risk-free',
     color: v => v > 1 ? 'green' : v > 0.5 ? 'amber' : v > 0 ? 'default' : 'red',
     fmt: 'num',
@@ -30,7 +30,7 @@ const RATIO_CONFIGS: RatioConfig[] = [
   {
     key: 'treynor_ratio',
     label: 'Treynor Ratio',
-    formula: 'TR = (r̄_p − r̄_f) / β_p',
+    formula: '$TR = (\\bar{r}_p - r_f) / \\beta_p$',
     interpretation: v => `Excess return per unit of systematic risk. ${v > 0 ? 'Positive β-adjusted return.' : 'Below risk-free on systematic basis.'}`,
     color: v => v > 0 ? 'green' : 'red',
     fmt: 'num',
@@ -39,7 +39,7 @@ const RATIO_CONFIGS: RatioConfig[] = [
   {
     key: 'sortino_ratio',
     label: 'Sortino Ratio',
-    formula: 'SoR = (r̄_p − r_MAR) / σ_downside',
+    formula: '$SoR = (\\bar{r}_p - r_{\\text{MAR}}) / \\sigma_{\\downarrow}$',
     interpretation: v => v > 1.5 ? 'Strong downside-adjusted return' : v > 0.5 ? 'Moderate' : 'Low downside risk-adjusted return',
     color: v => v > 1.5 ? 'green' : v > 0.5 ? 'amber' : 'red',
     fmt: 'num',
@@ -48,7 +48,7 @@ const RATIO_CONFIGS: RatioConfig[] = [
   {
     key: 'm2_modigliani',
     label: 'M² (Modigliani)',
-    formula: 'M²_p = r_f + SR · σ_bench',
+    formula: '$M^2_p = r_f + SR \\cdot \\sigma_{\\text{bench}}$',
     interpretation: v => `Leveraged/deleveraged to benchmark volatility: ${(v * 100).toFixed(2)}% p.a.`,
     color: v => v > 0.08 ? 'green' : v > 0.04 ? 'amber' : v > 0 ? 'default' : 'red',
     fmt: 'pct',
@@ -57,7 +57,7 @@ const RATIO_CONFIGS: RatioConfig[] = [
   {
     key: 'm2_sortino',
     label: 'M²-Sortino',
-    formula: 'M²_{Sort} = r_p + SoR(σ_{D,bench} − σ_D)',
+    formula: '$M^2_{\\text{Sort}} = r_p + SoR(\\sigma_{D,b} - \\sigma_D)$',
     interpretation: v => `Downside-adjusted M²: ${(v * 100).toFixed(2)}%`,
     color: v => v > 0.06 ? 'green' : v > 0 ? 'default' : 'red',
     fmt: 'pct',
@@ -66,7 +66,7 @@ const RATIO_CONFIGS: RatioConfig[] = [
   {
     key: 'information_ratio',
     label: 'Information Ratio',
-    formula: 'IR_p = (r̄_p − r̄_b) / σ(r_p − r_b)',
+    formula: '$IR_p = (\\bar{r}_p - \\bar{r}_b) / \\sigma(r_p - r_b)$',
     interpretation: v => v > 0.5 ? 'Strong active return vs tracking error' : v > 0 ? 'Positive active management value' : 'Negative: manager underperforms benchmark',
     color: v => v > 0.5 ? 'green' : v > 0 ? 'amber' : 'red',
     fmt: 'num',
@@ -75,7 +75,7 @@ const RATIO_CONFIGS: RatioConfig[] = [
   {
     key: 'appraisal_ratio',
     label: 'Appraisal Ratio',
-    formula: 'AR_p = α / σ_u',
+    formula: '$AR_p = \\alpha / \\sigma_u$',
     interpretation: v => `Alpha per unit of idiosyncratic risk. ${v > 0 ? 'Positive skill detected.' : 'Negative alpha — market underperformance.'}`,
     color: v => v > 0.5 ? 'green' : v > 0 ? 'amber' : 'red',
     fmt: 'num',
@@ -84,7 +84,7 @@ const RATIO_CONFIGS: RatioConfig[] = [
   {
     key: 'alpha',
     label: 'Jensen\'s Alpha',
-    formula: 'α = r_p − [r_f + β_p(r_m − r_f)]',
+    formula: '$\\alpha = r_p - [r_f + \\beta_p(r_m - r_f)]$',
     interpretation: v => v > 0 ? `Positive alpha: ${(v * 100 * 252).toFixed(2)}% pa above CAPM expected` : `Negative alpha: ${(v * 100 * 252).toFixed(2)}% pa below CAPM expected`,
     color: v => v > 0 ? 'green' : 'red',
     fmt: 'pct',
@@ -108,7 +108,7 @@ function RatioCard({ config, value }: { config: RatioConfig; value: number }) {
       <div className="flex items-start justify-between gap-2">
         <div>
           <p className="text-[11px] text-slate-500 uppercase tracking-wider">{config.label}</p>
-          <p className="text-[10px] text-slate-600 font-mono mt-0.5">{config.formula}</p>
+          <p className="text-[10px] text-slate-600 mt-0.5"><MathText text={config.formula} /></p>
         </div>
         <span className="text-[9px] text-slate-600 shrink-0">{config.ref}</span>
       </div>
@@ -213,7 +213,7 @@ export const PerformanceAppraisalCard = ({ data: propData }: PerformanceAppraisa
           <h3 className="text-lg font-bold text-white">Performance Appraisal</h3>
           <p className="text-xs text-slate-500 mt-0.5">
             M1 Part II §4–7 · Benchmark: <span className="text-slate-300 font-medium">{benchmarkSymbol}</span>
-            {moments && ` · β_p = ${moments.portfolio_beta.toFixed(3)}`}
+            {moments && <> · <MathText text={`$\\beta_p = ${moments.portfolio_beta.toFixed(3)}$`} /></>}
           </p>
         </div>
         <button onClick={() => computeAll()} className="px-3 py-1.5 rounded-lg border border-slate-600 text-slate-400 hover:text-white text-xs transition-colors">
@@ -240,15 +240,15 @@ export const PerformanceAppraisalCard = ({ data: propData }: PerformanceAppraisa
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-slate-400">
           <div>
             <p className="text-slate-300 font-semibold mb-1">Sharpe vs Treynor</p>
-            <p>Sharpe penalizes total risk σ_p (relevant for undiversified investors). Treynor penalizes only systematic risk β_p (relevant for diversified investors who hold many portfolios).</p>
+            <p><MathText text="Sharpe penalizes total risk $\sigma_p$ (undiversified investors). Treynor penalizes only systematic risk $\beta_p$ (diversified investors)." /></p>
           </div>
           <div>
             <p className="text-slate-300 font-semibold mb-1">Sortino Advantage</p>
-            <p>Sortino uses downside deviation (σ_D) below the MAR, not total σ. It does not penalize upside volatility — more appropriate for asymmetric return distributions.</p>
+            <p><MathText text="Sortino uses downside deviation $\sigma_{\downarrow}$ below the MAR, not total $\sigma$. Does not penalize upside volatility — better for asymmetric distributions." /></p>
           </div>
           <div>
             <p className="text-slate-300 font-semibold mb-1">M² (Modigliani-Modigliani)</p>
-            <p>Scales the portfolio to match benchmark volatility. Directly comparable in % terms: M²_p &gt; r_bench means outperformance on a risk-adjusted basis.</p>
+            <p><MathText text="Scales portfolio to benchmark volatility. Comparable in % terms: $M^2_p > r_{\text{bench}}$ means risk-adjusted outperformance." /></p>
           </div>
           <div>
             <p className="text-slate-300 font-semibold mb-1">Information Ratio</p>

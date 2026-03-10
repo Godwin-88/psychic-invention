@@ -1,20 +1,27 @@
 import { useState, useEffect } from 'react';
 import { postBlotterPositions, getBlotterHistory } from '@/utils/api';
 
-export const PositionTable = () => {
-  const [positions, setPositions] = useState<Array<{
-    asset: string;
-    quantity: number;
-    direction: string;
-    entry_price: number;
-    current_price: number;
-    unrealized_pnl: number;
-    unrealized_pnl_pct: number;
-  }>>([]);
+interface Position {
+  asset: string;
+  quantity: number;
+  direction: string;
+  entry_price: number;
+  current_price: number;
+  unrealized_pnl: number;
+  unrealized_pnl_pct: number;
+}
+
+interface PositionTableProps {
+  onSelectPosition?: (position: Position | null) => void;
+}
+
+export const PositionTable = ({ onSelectPosition }: PositionTableProps = {}) => {
+  const [positions, setPositions] = useState<Position[]>([]);
   const [history, setHistory] = useState<Array<Record<string, unknown>>>([]);
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(false);
   const [tab, setTab] = useState<'positions' | 'history'>('positions');
+  const [selectedAsset, setSelectedAsset] = useState<string | null>(null);
 
   const refresh = async () => {
     setLoading(true);
@@ -43,6 +50,16 @@ export const PositionTable = () => {
 
   const handlePriceChange = (asset: string, value: number) => {
     setPrices((prev) => ({ ...prev, [asset]: value }));
+  };
+
+  const handleSelectPosition = (position: Position) => {
+    if (selectedAsset === position.asset) {
+      setSelectedAsset(null);
+      onSelectPosition?.(null);
+    } else {
+      setSelectedAsset(position.asset);
+      onSelectPosition?.(position);
+    }
   };
 
   return (
@@ -77,6 +94,13 @@ export const PositionTable = () => {
 
       {tab === 'positions' && (
         <div className="space-y-6">
+          {selectedAsset && (
+            <div className="flex items-center gap-2 text-xs text-cyan-300 bg-cyan-900/20 border border-cyan-800/40 rounded-lg px-3 py-1.5">
+              <span className="font-mono font-bold">{selectedAsset}</span>
+              <span className="text-slate-400">selected — agent will focus analysis on this position</span>
+              <button onClick={() => { setSelectedAsset(null); onSelectPosition?.(null); }} className="ml-auto text-slate-500 hover:text-white">×</button>
+            </div>
+          )}
           <div className="flex flex-wrap gap-2 mb-4">
             {positions.map((p) => (
               <div key={p.asset} className="flex items-center gap-2">
@@ -109,7 +133,15 @@ export const PositionTable = () => {
               </thead>
               <tbody>
                 {positions.map((p) => (
-                  <tr key={p.asset} className="border-b border-slate-700">
+                  <tr
+                    key={p.asset}
+                    onClick={() => handleSelectPosition(p)}
+                    className={`border-b border-slate-700 cursor-pointer transition-colors ${
+                      selectedAsset === p.asset
+                        ? 'bg-cyan-900/30 border-l-2 border-l-cyan-500'
+                        : 'hover:bg-slate-800/50'
+                    }`}
+                  >
                     <td className="py-2 text-white font-medium">{p.asset}</td>
                     <td className="py-2 text-right text-slate-300">{p.quantity}</td>
                     <td className="py-2 text-right text-slate-300 capitalize">{p.direction}</td>

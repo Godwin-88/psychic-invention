@@ -6,6 +6,7 @@
  */
 import { useState } from 'react';
 import { useOptimizer } from '@/context/OptimizerContext';
+import { MathText } from '@/components/ui/Math';
 
 const pct = (v: number) => (v * 100).toFixed(2) + '%';
 
@@ -255,9 +256,9 @@ export const BLMPanel = () => {
       {/* Theory note */}
       <div className="rounded-xl border border-slate-700 bg-slate-800/30 p-4 text-xs text-slate-500 space-y-1">
         <p className="font-semibold text-slate-300">M3 L1 — Black-Litterman Model</p>
-        <p>Equilibrium: π = δΣw_m (reverse-engineering CAPM from market weights).</p>
-        <p>Posterior: μ_BL = [(τΣ)⁻¹ + P^TΩ⁻¹P]⁻¹[(τΣ)⁻¹π + P^TΩ⁻¹Q], Ω = τ·diag(PΣP^T).</p>
-        <p>τ controls prior weight: τ→0 ≈ pure equilibrium, τ→∞ ≈ pure views. δ is CAPM risk aversion (~2.5 global).</p>
+        <p><MathText text="Equilibrium: $\pi = \delta \Sigma w_m$ (reverse-engineering CAPM from market weights)." /></p>
+        <p><MathText text="Posterior: $\mu_{BL} = [(\tau\Sigma)^{-1} + P^\top\Omega^{-1}P]^{-1}[(\tau\Sigma)^{-1}\pi + P^\top\Omega^{-1}Q]$, $\;\Omega = \tau\,\mathrm{diag}(P\Sigma P^\top)$." /></p>
+        <p><MathText text="$\tau \to 0$: pure equilibrium prior · $\tau \to \infty$: pure views. $\delta \approx 2.5$ (global CAPM risk aversion)." /></p>
       </div>
     </div>
   );

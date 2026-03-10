@@ -16,6 +16,7 @@ import {
   postOptimizeKelly, postOptimizeKellySingle,
   getAssetHistory,
 } from '@/utils/api';
+import { useDataProvider } from '@/context/DataProviderContext';
 
 // ── Seeded demo data (same LCG as RiskContext) ────────────────────────────────
 function makeLCG(seed: number) {
@@ -138,6 +139,7 @@ interface OptimizerContextValue {
 const ctx = createContext<OptimizerContextValue | null>(null);
 
 export function OptimizerProvider({ children }: { children: ReactNode }) {
+  const { dataProvider } = useDataProvider();
   const [returns, setReturnsState] = useState<number[][]>(DEMO.returns);
   const [labels,  setLabelsState]  = useState<string[]>(DEMO.labels);
   const [dataSource, setDataSource] = useState<DataSource>('demo');
@@ -170,7 +172,7 @@ export function OptimizerProvider({ children }: { children: ReactNode }) {
     setFetchLoading(true); setFetchError(null);
     setMvoResult(null); setBlmResult(null); setRpResult(null); setHrpResult(null); setKellyResult(null);
     try {
-      const histories = await Promise.all(symbols.map(s => getAssetHistory(s, period).catch(() => [])));
+      const histories = await Promise.all(symbols.map(s => getAssetHistory(s, period, dataProvider).catch(() => [])));
       const dateMaps = histories.map(h =>
         Object.fromEntries(h.filter(r => r.close != null).map(r => [r.date, r.close as number]))
       );
@@ -192,7 +194,7 @@ export function OptimizerProvider({ children }: { children: ReactNode }) {
     } catch (e: unknown) {
       setFetchError(e instanceof Error ? e.message : 'Fetch failed');
     } finally { setFetchLoading(false); }
-  }, []);
+  }, [dataProvider]);
 
   const setReturns = useCallback((r: number[][], lbs?: string[]) => {
     setReturnsState(r);

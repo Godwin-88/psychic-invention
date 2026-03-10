@@ -33,7 +33,12 @@
       "Bash(python -c \"from app.transact_routes import router; print\\(''transact_routes OK''\\)\")",
       "Bash(./venv/Scripts/python -c \"from app.transact_routes import router; print\\(''transact_routes OK''\\)\")",
       "Bash(npm install katex @types/katex)",
-      "Bash(node -e \"require\\(''katex''\\); console.log\\(''katex ok''\\)\")"
+      "Bash(node -e \"require\\(''katex''\\); console.log\\(''katex ok''\\)\")",
+      "Bash(npm run type-check)",
+      "Bash(venv/Scripts/python.exe -c \":*)",
+      "Bash(curl -s -X POST http://localhost:8000/heston/calibrate -H \"Content-Type: application/json\" -d '{\"\"s\"\":100,\"\"r\"\":0.02,\"\"strikes\"\":[95,100,105],\"\"expiries\"\":[0.5,0.5,0.5],\"\"market_prices\"\":[8.5,5.0,2.5]}')",
+      "Bash(curl -s \"http://localhost:8000/assets/movers?top=5\")",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(''gainers:'', [f\"\"{g[''label'']} {g[''change_pct'']:+.2f}%\"\" for g in d[''gainers'']]\\); print\\(''losers:'', [f\"\"{l[''label'']} {l[''change_pct'']:+.2f}%\"\" for l in d[''losers'']]\\); print\\(''ts:'', d[''timestamp'']\\)\")"
     ]
   }
 }

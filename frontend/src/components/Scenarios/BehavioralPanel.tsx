@@ -18,6 +18,7 @@
  */
 import { useState } from 'react';
 import { useScenariosContext } from '@/context/ScenariosContext';
+import { MathText } from '@/components/ui/Math';
 
 const pct   = (v: number) => (v * 100).toFixed(2) + '%';
 const fmt4  = (v: number) => v.toFixed(4);
@@ -365,11 +366,11 @@ export const BehavioralPanel = () => {
 
       {/* Theory */}
       <div className="rounded-xl border border-slate-700 bg-slate-800/30 p-4 text-xs text-slate-500 space-y-1">
-        <p className="font-semibold text-slate-300">Prospect Theory — Kahneman & Tversky 1992 (M4 L2)</p>
-        <p>{'v(x) = x^α (gains), v(x) = −λ(−x)^β (losses) · α = β ≈ 0.88, λ ≈ 2.25.'}</p>
-        <p>{'w⁺(p) = p^γ / [p^γ + (1−p)^γ]^{1/γ}, γ = 0.61 (overweight small gain probs).'}</p>
-        <p>{'w⁻(p) = p^δ / [p^δ + (1−p)^δ]^{1/δ}, δ = 0.69 (overweight small loss probs).'}</p>
-        <p>{'Herding VaR: Σ_stressed = D·clip(ρ + Δρ)·D → higher portfolio vol → bigger VaR (2007 Quant Melt).'}</p>
+        <p className="font-semibold text-slate-300">Prospect Theory — Kahneman &amp; Tversky 1992 (M4 L2)</p>
+        <p><MathText text="$v(x) = x^\alpha$ (gains), $v(x) = -\lambda(-x)^\beta$ (losses) · $\alpha = \beta \approx 0.88$, $\lambda \approx 2.25$." /></p>
+        <p><MathText text="$w^+(p) = p^\gamma / [p^\gamma + (1-p)^\gamma]^{1/\gamma}$, $\gamma = 0.61$ (overweight small gain probs)." /></p>
+        <p><MathText text="$w^-(p) = p^\delta / [p^\delta + (1-p)^\delta]^{1/\delta}$, $\delta = 0.69$ (overweight small loss probs)." /></p>
+        <p><MathText text="Herding VaR: $\Sigma_{\text{stressed}} = D\cdot\mathrm{clip}(\rho + \Delta\rho)\cdot D$ → higher portfolio vol → bigger VaR (2007 Quant Melt)." /></p>
       </div>
     </div>
   );

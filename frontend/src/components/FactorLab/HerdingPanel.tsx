@@ -5,6 +5,7 @@
  * Requires Factor Model to be run first to extract asset betas.
  */
 import { useFactorContext } from '@/context/FactorContext';
+import { MathText } from '@/components/ui/Math';
 
 const pct  = (v: number) => (v * 100).toFixed(2) + '%';
 const fmt3 = (v: number) => v.toFixed(3);
@@ -222,7 +223,7 @@ export const HerdingPanel = () => {
       {/* Theory */}
       <div className="rounded-xl border border-slate-700 bg-slate-800/30 p-4 text-xs text-slate-500 space-y-1">
         <p className="font-semibold text-slate-300">Herding Risk — Khandani-Lo (M6 L2)</p>
-        <p>Crowding index = avg pairwise |correlation| of asset factor loadings across portfolio.</p>
+        <p><MathText text="Crowding index $= \frac{1}{N(N-1)}\sum_{i \neq j}|\rho_{ij}|$ — avg pairwise absolute correlation of factor loadings." /></p>
         <p>High crowding → many assets move together when a factor unwinds (2007 Quant Meltdown).</p>
         <p>Liquidity crisis: crowded factors amplify drawdowns as multiple strategies exit simultaneously.</p>
         <p>Mitigation: diversify across factors (value + momentum + quality) to reduce herding exposure.</p>

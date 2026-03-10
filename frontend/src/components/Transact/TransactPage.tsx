@@ -30,7 +30,7 @@ export const TransactPage = () => {
   return (
     <div className="container py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-white">Transact</h1>
+        <h1 className="text-3xl font-bold text-white">Quanti<span className="text-orange-400">🔥</span></h1>
         <p className="text-slate-400 mt-1">
           Portfolio · Risk · Optimizer · Scenarios (M3, M4) · Blotter
         </p>

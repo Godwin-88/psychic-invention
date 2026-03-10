@@ -27,6 +27,8 @@ export const API_CONFIG = {
     RISK_ES: '/risk/es',
     OPTIMIZE_MVO: '/optimize/mvo',
     OPTIMIZE_MVO_FRONTIER: '/optimize/mvo/frontier',
+    BLOTTER_CHART_BARS: '/blotter/chart/bars',
+    BLOTTER_INSTRUMENTS: '/blotter/instruments',
     BLOTTER_TRADE: '/blotter/trade',
     BLOTTER_POSITIONS: '/blotter/positions',
     BLOTTER_HISTORY: '/blotter/history',
@@ -66,6 +68,8 @@ export const API_CONFIG = {
     ASSETS_HISTORY: '/assets/history',
     ASSETS_QUOTE: '/assets/quote',
     ASSETS_OPTIONS: '/assets/options',
+    ASSETS_PROVIDERS: '/assets/providers',
+    ASSETS_MOVERS: '/assets/movers',
   },
   TIMEOUT: 30000,
 } as const;

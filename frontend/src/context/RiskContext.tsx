@@ -25,6 +25,7 @@ import {
   postRiskGreeksAggregate,
   getAssetHistory,
 } from '@/utils/api';
+import { useDataProvider } from '@/context/DataProviderContext';
 
 // ── Seeded RNG for deterministic demo data ─────────────────────────────────
 function makeLCG(seed: number) {
@@ -181,6 +182,7 @@ function computeLogReturns(priceMap: Record<string, number>, dates: string[]): n
 
 // ── Provider ───────────────────────────────────────────────────────────────
 export function RiskProvider({ children }: { children: ReactNode }) {
+  const { dataProvider } = useDataProvider();
   // ── Data state ────────────────────────────────────────────────────────
   const [returns, setReturnsState]     = useState<number[][]>(DEMO.returns);
   const [weights, setWeightsState]     = useState<number[]>(DEMO.weights);
@@ -229,7 +231,7 @@ export function RiskProvider({ children }: { children: ReactNode }) {
     try {
       // Fetch all histories in parallel; silently drop symbols that fail
       const histories = await Promise.all(
-        symbols.map(sym => getAssetHistory(sym, period).catch(() => []))
+        symbols.map(sym => getAssetHistory(sym, period, dataProvider).catch(() => []))
       );
 
       // Build date → close maps per symbol
@@ -286,7 +288,7 @@ export function RiskProvider({ children }: { children: ReactNode }) {
     } finally {
       setFetchLoading(false);
     }
-  }, []);
+  }, [dataProvider]);
 
   // ── Manual setters ────────────────────────────────────────────────────
   const setReturns = useCallback((r: number[][]) => {

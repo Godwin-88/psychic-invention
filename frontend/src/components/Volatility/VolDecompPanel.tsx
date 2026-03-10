@@ -7,6 +7,7 @@
 import { useState } from 'react';
 import { useVolatility } from '@/context/VolatilityContext';
 import { AssetSearchBar } from '@/components/AssetSearchBar';
+import { MathText } from '@/components/ui/Math';
 
 const pct   = (v: number) => (v * 100).toFixed(2) + '%';
 const fmt3  = (v: number) => v.toFixed(3);
@@ -277,7 +278,7 @@ export const VolDecompPanel = () => {
                 <p className="text-xs font-semibold text-slate-300 mb-3">Vol Components</p>
                 <VolAttributionBars systematic={d.systematic_vol} idiosyncratic={d.idiosyncratic_vol} />
                 <div className="mt-4 text-xs text-slate-500 space-y-0.5">
-                  <p>σ²_p = β_p²·σ²_m + w^T·Σ_ε·w</p>
+                  <p><MathText text="$\sigma^2_p = \beta_p^2\sigma^2_m + \mathbf{w}^\top\Sigma_\varepsilon\mathbf{w}$" /></p>
                   <p>Systematic: <span className="text-slate-300">{pct(d.systematic_pct)}</span> of variance</p>
                   <p>Idiosyncratic: <span className="text-slate-300">{pct(d.idiosyncratic_pct)}</span> of variance</p>
                 </div>
@@ -336,10 +337,10 @@ export const VolDecompPanel = () => {
       {/* Theory */}
       <div className="rounded-xl border border-slate-700 bg-slate-800/30 p-4 text-xs text-slate-500 space-y-1">
         <p className="font-semibold text-slate-300">M2 / M6 — Factor-Based Variance Decomposition</p>
-        <p>σ²_p = β_p²·σ²_m + w^T·Σ_ε·w where β_p = w^T·β and Σ_ε = diag(σ²_ε,ᵢ)</p>
+        <p><MathText text="$\sigma^2_p = \beta_p^2\sigma^2_m + \mathbf{w}^\top\Sigma_\varepsilon\mathbf{w}$ where $\beta_p = \mathbf{w}^\top\boldsymbol{\beta}$ and $\Sigma_\varepsilon = \mathrm{diag}(\sigma^2_{\varepsilon,i})$" /></p>
         <p>Systematic component explained by market factor (CAPM); idiosyncratic is diversifiable.</p>
-        <p>R²_i = 1 − Var(εᵢ)/Var(rᵢ): fraction of asset variance explained by market.</p>
-        <p>Portfolio diversification reduces idiosyncratic risk as N→∞ (law of large numbers).</p>
+        <p><MathText text="$R^2_i = 1 - \mathrm{Var}(\varepsilon_i)/\mathrm{Var}(r_i)$: fraction of asset variance explained by market." /></p>
+        <p><MathText text="Portfolio diversification reduces idiosyncratic risk as $N \to \infty$ (law of large numbers)." /></p>
       </div>
     </div>
   );

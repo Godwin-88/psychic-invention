@@ -69,8 +69,8 @@ export const Overview = () => {
       <div className="space-y-2">
         <p className="text-xs uppercase tracking-[0.3em] text-slate-500 font-semibold">Platform Overview</p>
         <h1 className="text-4xl font-black text-white leading-tight">
-          Transact{' '}
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">
+          Quanti<span className="text-orange-400">🔥</span>{' '}
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-400">
             Dashboard
           </span>
         </h1>

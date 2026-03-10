@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, BarChart2, Plus, Loader2 } from 'lucide-react';
 import { VIZ_OPTIONS, VIZ_CATEGORIES } from '@/config/vizOptions';
 import { getAssetHistory } from '@/utils/api';
+import { useDataProvider } from '@/context/DataProviderContext';
 import { VizChartPreview } from '@/components/Transact/VizChartPreview';
 import { useSelectedAssets } from '@/context/SelectedAssetsContext';
 
@@ -22,6 +23,7 @@ export const VisualizationWorkspace = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { selectedAssets } = useSelectedAssets();
+  const { dataProvider } = useDataProvider();
   const [activeViz, setActiveViz] = useState<string | null>(null);
   const [assetsFromUrl, setAssetsFromUrl] = useState<string[]>([]);
   const [timeframe, setTimeframe] = useState<string>('1mo');
@@ -57,7 +59,7 @@ export const VisualizationWorkspace = () => {
     } finally {
       setLoading(false);
     }
-  }, [activeViz, assetsKey, timeframe]);
+  }, [activeViz, assetsKey, timeframe, dataProvider]);
 
   useEffect(() => {
     if (activeViz && assetsKey) {

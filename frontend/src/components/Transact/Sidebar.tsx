@@ -33,7 +33,7 @@ export const Sidebar = ({ collapsed, onToggle }: Props) => {
       {/* Platform label */}
       {!collapsed && (
         <div className="px-4 pt-5 pb-4 border-b border-slate-800">
-          <p className="text-[10px] uppercase tracking-[0.25em] text-slate-500 font-semibold">Transact Platform</p>
+          <p className="text-[10px] uppercase tracking-[0.25em] text-slate-500 font-semibold">Quanti🔥 Platform</p>
         </div>
       )}
       {collapsed && <div className="h-14 border-b border-slate-800" />}

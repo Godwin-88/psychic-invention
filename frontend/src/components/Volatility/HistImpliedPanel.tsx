@@ -4,6 +4,7 @@
  * Computes rolling realised vol via /vol/historical and compares to ATM IV from live option chain.
  */
 import { useVolatility } from '@/context/VolatilityContext';
+import { MathText } from '@/components/ui/Math';
 
 const pct = (v: number) => (v * 100).toFixed(2) + '%';
 
@@ -176,7 +177,7 @@ export const HistImpliedPanel = () => {
           </div>
         </div>
         <p className="text-[10px] text-slate-600">
-          σ_r(t) = √(252/{rollingWindow} · Σᵢr²ᵢ)  ·  21d≈1mo  42d≈2mo  63d≈1qtr
+          <MathText text={`$\\sigma_r(t) = \\sqrt{252/${rollingWindow} \\cdot \\sum_i r_i^2}$ · 21d≈1mo · 42d≈2mo · 63d≈1qtr`} />
         </p>
       </div>
 
@@ -247,9 +248,9 @@ export const HistImpliedPanel = () => {
       {/* Theory */}
       <div className="rounded-xl border border-slate-700 bg-slate-800/30 p-4 text-xs text-slate-500 space-y-1">
         <p className="font-semibold text-slate-300">Realised vs Implied Volatility</p>
-        <p>Realised σ: σ_r = √(252/w · Σᵢ₌₁ʷ rᵢ²) — rolling window of daily log-returns from yfinance.</p>
+        <p><MathText text="Realised $\hat{\sigma}$: $\sigma_r = \sqrt{\tfrac{252}{w}\sum_{i=1}^{w} r_i^2}$ — rolling window of daily log-returns from yfinance." /></p>
         <p>Implied vol: ATM IV extracted from live option chain (bid/ask mid, nearest expiry) via yfinance.</p>
-        <p>Vol Risk Premium = σ_IV − σ_realised. Historically positive (~2–5%), earned by variance sellers.</p>
+        <p><MathText text="Vol Risk Premium $= \sigma_{\text{IV}} - \sigma_{\text{realised}}$. Historically positive ($\approx 2$–$5\%$), earned by variance sellers." /></p>
       </div>
     </div>
   );

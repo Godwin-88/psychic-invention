@@ -3,12 +3,14 @@
  *
  * Features:
  *   - Asset-type filter tabs (All · Equities · Forex · Crypto · ETFs · Indices · …)
+ *   - Data source toggle (yfinance | openbb | nautilus) top-right — affects history, quote, options
  *   - Live search with 400 ms debounce → /assets/search (yfinance-backed, all types)
  *   - Removable symbol chips showing current selection
  *   - "Load from global selection" shortcut (uses SelectedAssetsContext)
  */
 import { useState, useEffect, useRef } from 'react';
 import { useSelectedAssets } from '@/context/SelectedAssetsContext';
+import { useDataProvider } from '@/context/DataProviderContext';
 import { searchAssets } from '@/utils/api';
 
 interface AssetSearchBarProps {
@@ -20,6 +22,8 @@ interface AssetSearchBarProps {
   onRemove: (symbol: string) => void;
   /** Maximum number of symbols allowed */
   maxChips?: number;
+  /** Show data source toggle (yfinance / openbb / nautilus) top-right */
+  showDataProviderToggle?: boolean;
   /** Accent colour class for chip + active type tab */
   accentBg?: string;
   /** Chip border colour */
@@ -33,11 +37,13 @@ export function AssetSearchBar({
   onAdd,
   onRemove,
   maxChips = 20,
+  showDataProviderToggle = true,
   accentBg     = 'bg-rose-900/40',
   accentBorder = 'border-rose-700/50',
   accentText   = 'text-rose-200',
 }: AssetSearchBarProps) {
   const { assetTypes, selectedAssets } = useSelectedAssets();
+  const { dataProvider, setDataProvider, providerOptions } = useDataProvider();
 
   const [activeType, setActiveType] = useState('all');
   const [query, setQuery]           = useState('');
@@ -88,9 +94,10 @@ export function AssetSearchBar({
 
   return (
     <div className="space-y-3">
-      {/* ── Asset type filter ────────────────────────────────────────── */}
-      <div className="flex flex-wrap gap-1.5">
-        {assetTypes.map(t => (
+      {/* ── Asset type filter + Data source toggle (top right) ─────────── */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap gap-1.5">
+          {assetTypes.map(t => (
           <button
             key={t.id}
             onClick={() => { setActiveType(t.id); setResults([]); }}
@@ -103,6 +110,22 @@ export function AssetSearchBar({
             {typeLabels[t.id] ?? t.label}
           </button>
         ))}
+        </div>
+        {showDataProviderToggle && (
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="text-[11px] text-slate-500 uppercase tracking-wider">Source</span>
+            <select
+              value={dataProvider}
+              onChange={(e) => setDataProvider(e.target.value as 'yfinance' | 'openbb' | 'nautilus')}
+              className="rounded-md border border-slate-600 bg-slate-800 px-2 py-0.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-rose-500 focus:border-rose-500"
+              title="Data provider for history, quote, and options"
+            >
+              {providerOptions.map((opt) => (
+                <option key={opt.id} value={opt.id}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {/* ── Search input + dropdown ───────────────────────────────────── */}

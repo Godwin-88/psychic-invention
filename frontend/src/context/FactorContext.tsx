@@ -24,6 +24,7 @@ import {
   postFactorsCrowding,
   postFactorsPca,
 } from '@/utils/api';
+import { useDataProvider } from '@/context/DataProviderContext';
 
 // ── Result types ──────────────────────────────────────────────────────────────
 
@@ -125,6 +126,7 @@ export function useFactorContext() {
 
 // ── Provider ──────────────────────────────────────────────────────────────────
 export function FactorProvider({ children }: { children: ReactNode }) {
+  const { dataProvider } = useDataProvider();
   const [symbols,         setSymbols]         = useState<string[]>([]);
   const [returnMatrix,    setReturnMatrix]     = useState<number[][]>([]);
   const [labels,          setLabels]           = useState<string[]>([]);
@@ -171,7 +173,7 @@ export function FactorProvider({ children }: { children: ReactNode }) {
 
     try {
       const allSyms  = [...syms, benchmark];
-      const allHist  = await Promise.all(allSyms.map(s => getAssetHistory(s, per)));
+      const allHist  = await Promise.all(allSyms.map(s => getAssetHistory(s, per, dataProvider)));
 
       // Align on common dates (intersection)
       const dateSets = allHist.map(d =>
@@ -230,7 +232,7 @@ export function FactorProvider({ children }: { children: ReactNode }) {
     } finally {
       setMultiLoading(false);
     }
-  }, []);
+  }, [dataProvider]);
 
   // ── Helper: build factor matrix [intercept | benchmark] ─────────────────
   // Returns T×2 matrix (constant 1 + benchmark returns)

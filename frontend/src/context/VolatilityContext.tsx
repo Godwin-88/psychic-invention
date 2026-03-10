@@ -19,6 +19,7 @@ import {
   postVolFactorDecompose,
   postHestonCalibrate,
 } from '@/utils/api';
+import { useDataProvider } from '@/context/DataProviderContext';
 
 // ── Option contract shape (from /assets/options/{symbol}) ────────────────────
 export interface OptionContract {
@@ -139,6 +140,7 @@ export function useVolatility() {
 
 // ── Provider ──────────────────────────────────────────────────────────────────
 export function VolatilityProvider({ children }: { children: ReactNode }) {
+  const { dataProvider } = useDataProvider();
   // Primary asset
   const [symbol,      setSymbol]      = useState('');
   const [spot,        setSpot]        = useState<number | null>(null);
@@ -190,7 +192,7 @@ export function VolatilityProvider({ children }: { children: ReactNode }) {
 
     try {
       // 1. Price history → log-returns
-      const hist = await getAssetHistory(sym, period);
+      const hist = await getAssetHistory(sym, period, dataProvider);
       const valid = hist.filter(d => d.close !== null);
       if (valid.length < 30) throw new Error(`Insufficient price history for ${sym} (${valid.length} bars)`);
 
@@ -210,7 +212,7 @@ export function VolatilityProvider({ children }: { children: ReactNode }) {
 
       // 2. Option chain (may fail for ETFs/indices — non-fatal)
       try {
-        const optData = await getAssetOptions(sym, 3, 0.20);
+        const optData = await getAssetOptions(sym, 3, 0.20, dataProvider);
         const contracts = optData.contracts;
         setOptionChain(contracts);
         setSpot(optData.spot);
@@ -232,14 +234,14 @@ export function VolatilityProvider({ children }: { children: ReactNode }) {
     } finally {
       setAssetLoading(false);
     }
-  }, []);
+  }, [dataProvider]);
 
   // ── Fetch multi-asset ─────────────────────────────────────────────────────
   const fetchMultiAssets = useCallback(async (syms: string[], period = '1y') => {
     setMultiLoading(true);
     setError(null);
     try {
-      const allHist = await Promise.all(syms.map(s => getAssetHistory(s, period)));
+      const allHist = await Promise.all(syms.map(s => getAssetHistory(s, period, dataProvider)));
 
       // Align on common dates
       const dateSets = allHist.map(d =>
@@ -275,7 +277,7 @@ export function VolatilityProvider({ children }: { children: ReactNode }) {
     } finally {
       setMultiLoading(false);
     }
-  }, []);
+  }, [dataProvider]);
 
   // ── Heston surface ────────────────────────────────────────────────────────
   const computeSurface = useCallback(async () => {

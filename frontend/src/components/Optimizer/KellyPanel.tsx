@@ -7,6 +7,7 @@
 import { useState } from 'react';
 import { useOptimizer } from '@/context/OptimizerContext';
 import { postOptimizeKellySingle } from '@/utils/api';
+import { MathText } from '@/components/ui/Math';
 
 const pct = (v: number) => (v * 100).toFixed(2) + '%';
 const fmt3 = (v: number) => v.toFixed(4);
@@ -238,7 +239,7 @@ export const KellyPanel = () => {
 
           {/* Growth curve (always shown analytically) */}
           <div className="rounded-xl border border-slate-700 bg-slate-900/50 p-4">
-            <p className="text-xs text-slate-400 mb-3">G(f) = p·ln(1+b·f) + q·ln(1−f) — maximised at f*</p>
+            <p className="text-xs text-slate-400 mb-3"><MathText text="$G(f) = p\ln(1+bf) + q\ln(1-f)$ — maximised at $f^*$" /></p>
             <GrowthCurve p={p} b={b} fStar={singleResult?.f ?? fStarAnalytic} />
           </div>
         </div>
@@ -247,9 +248,9 @@ export const KellyPanel = () => {
       {/* Theory note */}
       <div className="rounded-xl border border-slate-700 bg-slate-800/30 p-4 text-xs text-slate-500 space-y-1">
         <p className="font-semibold text-slate-300">M5 L1 — Kelly Criterion</p>
-        <p>Single: f* = (bp − q)/b. Maximises E[log W_T] = G(f)·T asymptotically (Breiman 1961).</p>
-        <p>Multi-asset: w* = Σ⁻¹μ (log-optimal; same as tangency for log-normal). Solved numerically for non-normal returns.</p>
-        <p>Fractional Kelly κ∈(0,1] sacrifices some long-run growth for lower drawdown and parameter uncertainty protection.</p>
+        <p><MathText text="Single: $f^* = (bp - q)/b$. Maximises $\mathbb{E}[\log W_T] = G(f)\cdot T$ asymptotically (Breiman 1961)." /></p>
+        <p><MathText text="Multi-asset: $w^* = \Sigma^{-1}\mu$ (log-optimal; same as tangency for log-normal). Solved numerically for non-normal returns." /></p>
+        <p><MathText text="Fractional Kelly $\kappa \in (0,1]$ sacrifices long-run growth for lower drawdown and parameter uncertainty protection." /></p>
       </div>
     </div>
   );

@@ -16,6 +16,7 @@
  */
 import { useState } from 'react';
 import { useScenariosContext } from '@/context/ScenariosContext';
+import { MathText } from '@/components/ui/Math';
 
 const pct  = (v: number) => (v * 100).toFixed(2) + '%';
 const money = (v: number) => v >= 1e6
@@ -335,11 +336,11 @@ export const MonteCarloPanel = () => {
       {/* Theory */}
       <div className="rounded-xl border border-slate-700 bg-slate-800/30 p-4 text-xs text-slate-500 space-y-1">
         <p className="font-semibold text-slate-300">Monte Carlo Portfolio Simulation (M1 L2)</p>
-        <p>{'μ_p = w^T μ, σ_p = √(w^T Σ w) — portfolio moments estimated from live yfinance data.'}</p>
-        <p>{'Path: W_T = W₀ · ∏_{t=1}^{T} (1 + r_t), r_t ~ N(μ_p, σ_p) or t(df, μ_p, σ_p).'}</p>
-        <p>{'VaR(α) = α-th quantile of L = W₀ − W_T over all paths.'}</p>
-        <p>{'CVaR(α) = E[L | L ≥ VaR(α)] — Expected Shortfall, coherent risk measure (Basel III).'}</p>
-        <p>Fat tails: Student-t with low df captures volatility clustering and heavy tails better than Normal.</p>
+        <p><MathText text="$\mu_p = w^\top\mu$, $\sigma_p = \sqrt{w^\top\Sigma w}$ — portfolio moments estimated from live yfinance data." /></p>
+        <p><MathText text="Path: $W_T = W_0 \cdot \prod_{t=1}^{T}(1 + r_t)$, $r_t \sim \mathcal{N}(\mu_p, \sigma_p)$ or $t(\nu, \mu_p, \sigma_p)$." /></p>
+        <p><MathText text="$\mathrm{VaR}(\alpha)$ = $\alpha$-th quantile of $L = W_0 - W_T$ over all paths." /></p>
+        <p><MathText text="$\mathrm{CVaR}(\alpha) = \mathbb{E}[L \mid L \geq \mathrm{VaR}(\alpha)]$ — Expected Shortfall, coherent risk measure (Basel III)." /></p>
+        <p><MathText text="Fat tails: Student-$t$ with low $\nu$ captures volatility clustering and heavy tails better than Normal." /></p>
       </div>
     </div>
   );

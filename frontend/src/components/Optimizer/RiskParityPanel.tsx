@@ -6,6 +6,7 @@
  */
 import { useState } from 'react';
 import { useOptimizer } from '@/context/OptimizerContext';
+import { MathText } from '@/components/ui/Math';
 
 const pct = (v: number) => (v * 100).toFixed(2) + '%';
 
@@ -125,7 +126,7 @@ export const RiskParityPanel = () => {
             />
             {/* RC sum check */}
             <p className="text-[10px] text-slate-600 mt-3">
-              ΣRC = {rpResult.risk_contributions.reduce((a, b) => a + b, 0).toFixed(4)}  (target 1.0)
+              <MathText text={`$\Sigma\mathrm{RC}$ = ${rpResult.risk_contributions.reduce((a, b) => a + b, 0).toFixed(4)} (target 1.0)`} />
             </p>
           </div>
 
@@ -165,9 +166,9 @@ export const RiskParityPanel = () => {
       {/* Theory note */}
       <div className="rounded-xl border border-slate-700 bg-slate-800/30 p-4 text-xs text-slate-500 space-y-1">
         <p className="font-semibold text-slate-300">M5 L3 — Equal Risk Contribution / Relaxed Risk Parity</p>
-        <p>ERC condition: RC_i = w_i·(Σw)_i/σ_p = σ_p/N ∀i. No closed form; solved via iterative (Roncalli 2013) or SOCP.</p>
-        <p>RRP: min ½w^TΣw − ρ·μ^Tw s.t. Σ_i w_i=1, second-order cone risk-budget constraints.</p>
-        <p>ρ=0: volatility-minimising ERC. ρ&gt;0 tilts toward higher-μ assets while maintaining approximate equal RC.</p>
+        <p><MathText text="ERC condition: $\mathrm{RC}_i = w_i(\Sigma w)_i/\sigma_p = \sigma_p/N\;\forall i$. No closed form; solved via iterative (Roncalli 2013) or SOCP." /></p>
+        <p><MathText text="RRP: $\min_w \tfrac{1}{2}w^\top\Sigma w - \rho\,\mu^\top w$ s.t. $\sum_i w_i = 1$, second-order cone risk-budget constraints." /></p>
+        <p><MathText text="$\rho = 0$: volatility-minimising ERC. $\rho > 0$ tilts toward higher-$\mu$ assets while maintaining approximate equal RC." /></p>
       </div>
     </div>
   );

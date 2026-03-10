@@ -6,6 +6,7 @@
  */
 import type { ReactNode } from 'react';
 import { useOptimizer } from '@/context/OptimizerContext';
+import { MathText } from '@/components/ui/Math';
 
 const pct = (v: number) => (v * 100).toFixed(2) + '%';
 
@@ -202,7 +203,7 @@ export const HRPPanel = () => {
           <div className="lg:col-span-2 rounded-xl border border-slate-700 bg-slate-900/50 p-4">
             <p className="text-xs text-slate-400 mb-3">
               Hierarchical clustering dendrogram — assets ordered by correlation structure.
-              Y-axis: Mantegna distance d(ρ) = √(2(1−ρ)).
+              Y-axis: <MathText text="Mantegna distance $d(\rho) = \sqrt{2(1-\rho)}$." />
             </p>
             <Dendrogram
               n={labels.length}
@@ -251,10 +252,10 @@ export const HRPPanel = () => {
       {/* Theory note */}
       <div className="rounded-xl border border-slate-700 bg-slate-800/30 p-4 text-xs text-slate-500 space-y-1">
         <p className="font-semibold text-slate-300">M7 L4 — Hierarchical Risk Parity (López de Prado 2016)</p>
-        <p>Step 1: compute Mantegna distance matrix D_ij = √(2(1−ρ_ij)); apply hierarchical clustering (Ward or single-linkage).</p>
-        <p>Step 2: quasi-diagonalise Σ by reordering columns/rows per dendrogram leaf sequence.</p>
+        <p><MathText text="Step 1: Mantegna distance $D_{ij} = \sqrt{2(1-\rho_{ij})}$; apply hierarchical clustering (Ward or single-linkage)." /></p>
+        <p><MathText text="Step 2: quasi-diagonalise $\Sigma$ by reordering columns/rows per dendrogram leaf sequence." /></p>
         <p>Step 3: recursive bisection — split cluster, allocate inverse-variance weights proportionally.</p>
-        <p>Advantages: no matrix inversion (stable for large N), respects hierarchical correlation structure, out-of-sample robust.</p>
+        <p><MathText text="Advantages: no $\Sigma^{-1}$ inversion (stable for large $N$), respects hierarchical correlation structure, out-of-sample robust." /></p>
       </div>
     </div>
   );

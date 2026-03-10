@@ -12,8 +12,10 @@
  * OTM = dim    (moneyness > +0.02 for calls / < −0.02 for puts)
  */
 import { useState, useMemo, useCallback } from 'react';
+import { useDataProvider } from '@/context/DataProviderContext';
 import { getAssetOptions, getAssetQuote } from '@/utils/api';
 import { computeCallGreeks } from '@/utils/greeks';
+import { MathText } from '@/components/ui/Math';
 
 // ── BS pricing (client-side) ──────────────────────────────────────────────────
 const INV_SQRT2PI = 1 / Math.sqrt(2 * Math.PI);
@@ -61,6 +63,7 @@ function moneynessLabel(m: number): { label: string; cls: string } {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export const OptionChainWorkspace = () => {
+  const { dataProvider } = useDataProvider();
   const [symbol,    setSymbol]    = useState('AAPL');
   const [nExpiries, setNExpiries] = useState(3);
   const [mRange,    setMRange]    = useState(0.25);
@@ -75,15 +78,15 @@ export const OptionChainWorkspace = () => {
     setLoading(true); setError(null); setData(null);
     try {
       const [opts, quote] = await Promise.all([
-        getAssetOptions(symbol, nExpiries, mRange),
-        getAssetQuote(symbol).catch(() => null),
+        getAssetOptions(symbol, nExpiries, mRange, dataProvider),
+        getAssetQuote(symbol, dataProvider).catch(() => null),
       ]);
       const spot = quote?.spot ?? opts.spot;
       setData({ spot, contracts: opts.contracts });
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to fetch option chain');
     } finally { setLoading(false); }
-  }, [symbol, nExpiries, mRange]);
+  }, [symbol, nExpiries, mRange, dataProvider]);
 
   // Group contracts by expiry_str
   const grouped = useMemo(() => {
@@ -136,7 +139,7 @@ export const OptionChainWorkspace = () => {
             </select>
           </div>
           <div>
-            <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1">r_f</label>
+            <label className="block text-[10px] text-slate-500 uppercase tracking-wider mb-1"><MathText text="$r_f$" /></label>
             <input type="number" value={rfRate} step={0.005} min={0} max={0.3}
               onChange={e => setRfRate(parseFloat(e.target.value) || 0)}
               className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-1.5 text-white text-sm" />
@@ -184,7 +187,7 @@ export const OptionChainWorkspace = () => {
             <div key={exp} className="rounded-xl border border-slate-700 bg-slate-900/50 overflow-hidden">
               <div className="px-4 py-2 bg-slate-800/50 border-b border-slate-700 flex items-center gap-3">
                 <p className="text-sm font-semibold text-slate-200">{exp}</p>
-                <span className="text-xs text-slate-500">τ = {tau.toFixed(4)} years</span>
+                <span className="text-xs text-slate-500"><MathText text={`$\\tau$ = ${tau.toFixed(4)} yr`} /></span>
                 <span className="text-xs text-slate-500">{contracts.length} strikes</span>
               </div>
               <div className="overflow-x-auto">
@@ -196,8 +199,8 @@ export const OptionChainWorkspace = () => {
                       <th className="px-3 py-2 text-right">Mkt Price</th>
                       <th className="px-3 py-2 text-right">Imp. Vol</th>
                       <th className="px-3 py-2 text-right">BS Theoretical</th>
-                      <th className="px-3 py-2 text-right">Δ (BS)</th>
-                      <th className="px-3 py-2 text-right">Mkt−BS</th>
+                      <th className="px-3 py-2 text-right"><MathText text="$\Delta$ (BS)" /></th>
+                      <th className="px-3 py-2 text-right"><MathText text="Mkt$-$BS" /></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -234,7 +237,7 @@ export const OptionChainWorkspace = () => {
           ))}
 
           <p className="text-[10px] text-slate-600">
-            BS Theoretical uses live IV per strike. Mkt−BS &gt; 0 → option richer than model (vol-smile / demand premium).
+            <MathText text="BS Theoretical uses live IV per strike. $\text{Mkt}-\text{BS} > 0$ → option richer than model (vol-smile / demand premium)." />
           </p>
         </div>
       )}

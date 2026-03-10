@@ -55,6 +55,14 @@ except ImportError as e:
     print(f"Warning: Asset universe routes not available: {e}")
     ASSET_UNIVERSE_AVAILABLE = False
 
+# Import Agent gateway (Neo4j + Ollama skills)
+try:
+    from .agents.routes import router as agents_router
+    AGENTS_AVAILABLE = True
+except ImportError as e:
+    print(f"Warning: Agent routes not available: {e}")
+    AGENTS_AVAILABLE = False
+
 # Configure enhanced logging
 configure_logging(log_level="INFO", log_format="json")
 
@@ -64,29 +72,37 @@ app = FastAPI(
     description="High-performance derivatives pricing engine with comprehensive error handling and monitoring"
 )
 
-# CORS must be the outermost middleware — add it first
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Request ID middleware (inner — runs after CORS)
+# Request ID middleware — defined first so CORS (added after) is outermost.
+# In Starlette, add_middleware() inserts at position 0; reversed() at build time
+# means the LAST add_middleware call becomes the outermost wrapper.
 @app.middleware("http")
 async def add_request_id(request: Request, call_next):
     request_id = str(uuid.uuid4())
     request.state.request_id = request_id
 
     start_time = time.time()
-    response = await call_next(request)
+    try:
+        response = await call_next(request)
+    except Exception:
+        from fastapi.responses import JSONResponse
+        response = JSONResponse(status_code=500, content={"detail": "Internal server error"})
     process_time = time.time() - start_time
 
     response.headers["X-Request-ID"] = request_id
     response.headers["X-Process-Time"] = str(process_time)
 
     return response
+
+# CORS — added AFTER the @app.middleware decorator so it's inserted last
+# and therefore becomes the TRUE outermost middleware after stack reversal.
+_ALLOWED_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Include market data router if available
 if MARKET_DATA_AVAILABLE:
@@ -105,6 +121,10 @@ if TRANSACT_AVAILABLE:
 # Include Asset Universe (yfinance) router
 if ASSET_UNIVERSE_AVAILABLE:
     app.include_router(asset_universe_router)
+
+# Include Agent router (Neo4j + Ollama)
+if AGENTS_AVAILABLE:
+    app.include_router(agents_router)
 
 # Add Redis health check endpoint if available
 if REDIS_AVAILABLE:

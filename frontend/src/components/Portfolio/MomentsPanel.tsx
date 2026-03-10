@@ -3,7 +3,7 @@
  * M1 L1: R_p = w^T r, σ²_p = w^T Σ w, β_p, γ̂, κ̂
  */
 import { usePortfolio, type MomentsData } from '@/context/PortfolioContext';
-import { MathBlock } from '@/components/ui/Math';
+import { MathBlock, MathText } from '@/components/ui/Math';
 
 function MetricCard({
   label, formula, value, fmt = 'num4', description, color = 'default',
@@ -18,7 +18,7 @@ function MetricCard({
   return (
     <div className={`rounded-xl border ${ring} bg-slate-800/50 p-4 space-y-1`}>
       <p className="text-[11px] text-slate-500 uppercase tracking-wider">{label}</p>
-      {formula && <p className="text-[10px] text-slate-600 font-mono">{formula}</p>}
+      {formula && <p className="text-[10px] text-slate-600 mt-0.5"><MathText text={formula} /></p>}
       <p className={`text-xl font-mono font-bold ${textColor}`}>{display}</p>
       {description && <p className="text-[11px] text-slate-500 leading-tight">{description}</p>}
     </div>
@@ -34,7 +34,7 @@ function DistributionShape({ skewness, kurtosis }: { skewness: number; kurtosis:
       <div className="space-y-3">
         <div>
           <div className="flex justify-between text-xs text-slate-400 mb-1">
-            <span>Skewness γ̂ = {skewness.toFixed(4)}</span>
+            <span><MathText text={`Skewness $\\hat{\\gamma}$ = ${skewness.toFixed(4)}`} /></span>
             <span className={skewness < -0.5 ? 'text-red-400' : skewness > 0.5 ? 'text-emerald-400' : 'text-slate-400'}>
               {skewness < -0.5 ? 'Left-skewed (tail risk)' : skewness > 0.5 ? 'Right-skewed' : 'Near-symmetric'}
             </span>
@@ -53,7 +53,7 @@ function DistributionShape({ skewness, kurtosis }: { skewness: number; kurtosis:
         </div>
         <div>
           <div className="flex justify-between text-xs text-slate-400 mb-1">
-            <span>Excess Kurtosis κ̂ = {kurtosis.toFixed(4)}</span>
+            <span><MathText text={`Excess Kurtosis $\\hat{\\kappa}$ = ${kurtosis.toFixed(4)}`} /></span>
             <span className={kurtosis > 1 ? 'text-red-400' : kurtosis > 0 ? 'text-amber-400' : 'text-slate-400'}>
               {kurtosis > 1 ? 'Leptokurtic (heavy tails)' : kurtosis < -0.5 ? 'Platykurtic' : 'Mesokurtic (normal-like)'}
             </span>
@@ -70,7 +70,7 @@ function DistributionShape({ skewness, kurtosis }: { skewness: number; kurtosis:
         </div>
         {kurtosis > 1 && (
           <div className="rounded-lg border border-red-800/40 bg-red-900/10 px-3 py-2 text-xs text-red-300">
-            ⚠ κ_excess &gt; 1: parametric VaR (normal) will underestimate tail losses. Prefer historical or t-distribution VaR.
+            <MathText text="⚠ $\hat{\kappa} > 1$: parametric VaR (normal) will underestimate tail losses. Prefer historical or $t$-distribution VaR." />
           </div>
         )}
       </div>
@@ -174,13 +174,13 @@ export const MomentsPanel = ({ data: propData }: MomentsPanelProps = {}) => {
       <div>
         <p className="text-xs text-slate-500 uppercase tracking-wider mb-3">First Two Moments (Annualized)</p>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <MetricCard label="Portfolio Return" formula="R_p = w^T r̄" value={annReturn} fmt="pct2"
+          <MetricCard label="Portfolio Return" formula="$R_p = \mathbf{w}^\top \bar{r}$" value={annReturn} fmt="pct2"
             color={annReturn >= 0 ? 'green' : 'red'} description="Weighted avg of asset mean returns" />
-          <MetricCard label="Portfolio Variance" formula="σ²_p = w^T Σ w" value={data.portfolio_variance * 252} fmt="num4"
+          <MetricCard label="Portfolio Variance" formula="$\sigma^2_p = \mathbf{w}^\top \Sigma \mathbf{w}$" value={data.portfolio_variance * 252} fmt="num4"
             description="Quadratic form of covariance matrix" />
-          <MetricCard label="Portfolio Volatility" formula="σ_p = √(w^T Σ w)" value={annVol} fmt="pct2"
+          <MetricCard label="Portfolio Volatility" formula="$\sigma_p = \sqrt{\mathbf{w}^\top \Sigma \mathbf{w}}$" value={annVol} fmt="pct2"
             description="Std dev of portfolio returns" />
-          <MetricCard label="Portfolio Beta" formula="β_p = w^T β" value={data.portfolio_beta} fmt="num4"
+          <MetricCard label="Portfolio Beta" formula="$\beta_p = \mathbf{w}^\top \beta$" value={data.portfolio_beta} fmt="num4"
             color={data.portfolio_beta > 1.2 ? 'amber' : data.portfolio_beta < 0.8 ? 'blue' : 'default'}
             description="Market sensitivity vs benchmark" />
         </div>
@@ -188,13 +188,15 @@ export const MomentsPanel = ({ data: propData }: MomentsPanelProps = {}) => {
 
       {/* Risk decomposition */}
       <div>
-        <p className="text-xs text-slate-500 uppercase tracking-wider mb-3">Risk Decomposition: σ²_p = β²_p·σ²_m + σ²_u (M1 §3)</p>
+        <p className="text-xs text-slate-500 uppercase tracking-wider mb-3">
+          <MathText text="Risk Decomposition: $\sigma^2_p = \beta^2_p \sigma^2_m + \sigma^2_u$ (M1 §3)" />
+        </p>
         <div className="grid grid-cols-3 gap-3">
-          <MetricCard label="Systematic Risk" formula="β²_p · σ²_m" value={data.systematic_risk * 252} fmt="num4"
+          <MetricCard label="Systematic Risk" formula="$\beta^2_p \sigma^2_m$" value={data.systematic_risk * 252} fmt="num4"
             color="blue" description="Cannot be diversified away" />
-          <MetricCard label="Non-Systematic Risk" formula="σ²_u = σ²_p − β²_p·σ²_m" value={data.non_systematic_risk * 252} fmt="num4"
+          <MetricCard label="Non-Systematic Risk" formula="$\sigma^2_u = \sigma^2_p - \beta^2_p \sigma^2_m$" value={data.non_systematic_risk * 252} fmt="num4"
             description="Idiosyncratic — diversifiable" />
-          <MetricCard label="Diversification Benefit" formula="1 − σ²_u / σ²_p"
+          <MetricCard label="Diversification Benefit" formula="$1 - \sigma^2_u / \sigma^2_p$"
             value={data.portfolio_variance > 0 ? 1 - data.non_systematic_risk / data.portfolio_variance : 0}
             fmt="num4" color="green" description="Market-factor R²" />
         </div>
@@ -226,10 +228,10 @@ export const MomentsPanel = ({ data: propData }: MomentsPanelProps = {}) => {
       <div>
         <p className="text-xs text-slate-500 uppercase tracking-wider mb-3">Higher Moments (M1 Part II §5)</p>
         <div className="grid grid-cols-2 gap-3">
-          <MetricCard label="Skewness γ̂" formula="[N/((N-1)(N-2))]·Σ(r−r̄)³/s³" value={data.skewness} fmt="num4"
+          <MetricCard label="Skewness" formula="$\hat{\gamma} = \frac{N}{(N-1)(N-2)}\sum\!\left(\frac{r-\bar{r}}{s}\right)^{\!3}$" value={data.skewness} fmt="num4"
             color={data.skewness < -0.5 ? 'red' : data.skewness > 0.5 ? 'green' : 'default'}
             description={data.skewness < -0.5 ? 'Negative: asymmetric downside tail' : data.skewness > 0.5 ? 'Positive: upside skewed' : 'Near-symmetric'} />
-          <MetricCard label="Excess Kurtosis κ̂" formula="[N(N+1)/((N-1)(N-2)(N-3))]·Σ(r−r̄)⁴/s⁴ − 3" value={data.kurtosis_excess} fmt="num4"
+          <MetricCard label="Excess Kurtosis" formula="$\hat{\kappa} = \frac{N(N+1)}{(N-1)(N-2)(N-3)}\sum\!\left(\frac{r-\bar{r}}{s}\right)^{\!4} - 3$" value={data.kurtosis_excess} fmt="num4"
             color={data.kurtosis_excess > 1 ? 'red' : 'default'}
             description={data.kurtosis_excess > 1 ? 'Leptokurtic: fat tails, VaR risk' : 'Tail weight near-normal'} />
         </div>

@@ -6,6 +6,7 @@
  */
 import { useState } from 'react';
 import { useFactorContext } from '@/context/FactorContext';
+import { MathText } from '@/components/ui/Math';
 
 const pct  = (v: number) => (v * 100).toFixed(2) + '%';
 const fmt3 = (v: number) => v.toFixed(3);
@@ -246,10 +247,10 @@ export const SmartBetaPanel = () => {
       {/* Theory */}
       <div className="rounded-xl border border-slate-700 bg-slate-800/30 p-4 text-xs text-slate-500 space-y-1">
         <p className="font-semibold text-slate-300">Smart Beta — Momentum Strategy (M6 L2)</p>
-        <p>Momentum: MOM_i = cumulative log-return over ≈12 months, skip last 1 month (reversal).</p>
+        <p><MathText text="Momentum: $\text{MOM}_i$ = cumulative log-return over $\approx 12$ months, skip last 1 month (short-term reversal)." /></p>
         <p>Quintile sort: divide universe into 5 groups; long Q5 (high MOM), equal-weight within.</p>
-        <p>Signal-weighted: w_i ∝ max(MOM_i, 0) — tilt toward positive momentum assets.</p>
-        <p>Active tilt = Smart Beta w − Equal-weight w (positive = overweight, negative = underweight).</p>
+        <p><MathText text="Signal-weighted: $w_i \propto \max(\text{MOM}_i,\, 0)$ — tilt toward positive momentum assets." /></p>
+        <p><MathText text="Active tilt $= w_{\text{SB}} - w_{1/N}$ (positive = overweight, negative = underweight)." /></p>
       </div>
     </div>
   );

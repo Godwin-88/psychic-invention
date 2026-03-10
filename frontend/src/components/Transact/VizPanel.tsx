@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { X, ExternalLink, CandlestickChart, LineChart, PieChart, BarChart2, ScatterChart, LayoutGrid, Loader2 } from 'lucide-react';
 import { VIZ_CATEGORIES, VIZ_OPTIONS, type VizOption } from '@/config/vizOptions';
 import { getAssetHistory } from '@/utils/api';
+import { useDataProvider } from '@/context/DataProviderContext';
 import { VizChartPreview } from '@/components/Transact/VizChartPreview';
 import type { SelectedAsset } from '@/context/SelectedAssetsContext';
 
@@ -68,7 +69,7 @@ export const VizPanel = ({ open, onClose, selectedAssets, selectedViz, onSelectV
     setError(null);
     setLoading(true);
     try {
-      const data = await getAssetHistory(symbol, timeframe);
+      const data = await getAssetHistory(symbol, timeframe, dataProvider);
       setChartData(data);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load history');

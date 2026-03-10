@@ -17,6 +17,7 @@
  */
 import { useState } from 'react';
 import { useScenariosContext } from '@/context/ScenariosContext';
+import { MathText } from '@/components/ui/Math';
 
 const pct = (v: number) => (v * 100).toFixed(2) + '%';
 
@@ -287,9 +288,9 @@ export const ProbabilisticPanel = () => {
       {/* Theory */}
       <div className="rounded-xl border border-slate-700 bg-slate-800/30 p-4 text-xs text-slate-500 space-y-1">
         <p className="font-semibold text-slate-300">Probabilistic Scenario Optimisation (M3 L4)</p>
-        <p>{'E[r] = Σ_{k} pₖ · rₖ — probability-weighted expected return vector (N×1).'}</p>
-        <p>{'Σ = Σ_{k} pₖ · (rₖ − E[r])(rₖ − E[r])^T — scenario-weighted covariance matrix.'}</p>
-        <p>{'Optimise: min w^T Σ w  s.t.  w^T E[r] ≥ target, Σwᵢ = 1, wᵢ ≥ 0 — QP solved by ECOS.'}</p>
+        <p><MathText text="$\mathbb{E}[r] = \sum_{k} p_k \cdot r_k$ — probability-weighted expected return vector ($N \times 1$)." /></p>
+        <p><MathText text="$\Sigma = \sum_{k} p_k \cdot (r_k - \mathbb{E}[r])(r_k - \mathbb{E}[r])^\top$ — scenario-weighted covariance matrix." /></p>
+        <p><MathText text="Optimise: $\min_w w^\top\Sigma w$ s.t. $w^\top\mathbb{E}[r] \geq \text{target}$, $\sum_i w_i = 1$, $w_i \geq 0$ — QP solved by ECOS." /></p>
         <p>Interpreting PSO: concentrates weight toward high E[r] assets whose variability across scenarios is low.</p>
       </div>
     </div>

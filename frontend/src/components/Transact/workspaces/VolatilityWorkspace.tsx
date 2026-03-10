@@ -11,9 +11,11 @@
  *   /transact/volatility/hist-implied → HistImpliedPanel
  *   /transact/volatility/decomposition → VolDecompPanel   (has own multi-asset bar)
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { VolatilityProvider, useVolatility } from '@/context/VolatilityContext';
+import { useAgentContext, DEFAULT_SUGGESTED_QUESTIONS } from '@/context/AgentContext';
+import { MathText } from '@/components/ui/Math';
 import { AssetSearchBar }   from '@/components/AssetSearchBar';
 import { IVSurfacePanel }   from '@/components/Volatility/IVSurfacePanel';
 import { HestonPanel }      from '@/components/Volatility/HestonPanel';
@@ -22,11 +24,58 @@ import { VolDecompPanel }   from '@/components/Volatility/VolDecompPanel';
 
 // ── Panel metadata ─────────────────────────────────────────────────────────────
 const PANEL_META: Record<string, { title: string; badge: string; desc: string }> = {
-  surface:      { title: 'Implied Volatility Surface',   badge: 'Heston · DPE',       desc: 'Heston SV surface · vol smile · ATM term structure' },
-  heston:       { title: 'Heston Model Calibration',     badge: 'L-BFGS-B · Feller',  desc: 'Calibrate κ,θ,ξ,ρ,v₀ from live market option prices' },
-  'hist-implied': { title: 'Historical vs Implied Vol',  badge: 'Vol Risk Premium',    desc: 'Rolling realised σ vs ATM implied vol · VRP dynamics' },
-  decomp:       { title: 'Factor Vol Decomposition',     badge: 'M2 · M6 · CAPM',      desc: 'σ²_p = β_p²σ²_m + w^TΣ_εw · systematic vs idiosyncratic' },
+  surface:      { title: 'Implied Volatility Surface',   badge: 'Heston · DPE',       desc: 'Heston SV: $dv_t = \\kappa(\\theta - v_t)dt + \\xi\\sqrt{v_t}dW^v_t$ · vol smile · ATM term structure' },
+  heston:       { title: 'Heston Model Calibration',     badge: 'L-BFGS-B · Feller',  desc: 'Calibrate $\\kappa,\\theta,\\xi,\\rho,v_0$ from live market option prices · Feller: $2\\kappa\\theta > \\xi^2$' },
+  'hist-implied': { title: 'Historical vs Implied Vol',  badge: 'Vol Risk Premium',    desc: 'Rolling realised $\\hat{\\sigma}$ vs ATM implied vol · VRP $= \\text{IV} - \\text{RV}$ dynamics' },
+  decomp:       { title: 'Factor Vol Decomposition',     badge: 'M2 · M6 · CAPM',      desc: '$\\sigma^2_p = \\beta_p^2\\sigma^2_m + \\mathbf{w}^\\top\\Sigma_\\varepsilon\\mathbf{w}$ · systematic vs idiosyncratic' },
 };
+
+// ── Agent context sync hook ────────────────────────────────────────────────────
+function useVolatilityAgentSync() {
+  const { setWorkspaceContext } = useAgentContext();
+  const { symbol, atmIV, hestonParams, histVolResult, optionChain, calibResult } = useVolatility();
+
+  useEffect(() => {
+    const rawData: Record<string, unknown> = {};
+    const metrics: Record<string, string | number | null> = {
+      symbol: symbol || 'none',
+      options_loaded: optionChain.length,
+    };
+
+    if (atmIV !== null) {
+      metrics['atm_iv'] = (atmIV * 100).toFixed(2) + '%';
+    }
+    if (histVolResult) {
+      rawData.historical_vol = histVolResult;
+      metrics['hist_vol'] = (histVolResult.full_period_vol * 100).toFixed(2) + '%';
+    }
+    if (calibResult) {
+      rawData.heston_calib = calibResult;
+      metrics['kappa']     = calibResult.kappa.toFixed(3);
+      metrics['theta']     = (calibResult.theta * 100).toFixed(2) + '%';
+    } else if (symbol) {
+      rawData.heston_params = hestonParams;
+    }
+    if (optionChain.length > 0) {
+      rawData.option_chain_summary = {
+        count: optionChain.length,
+        expiries: [...new Set(optionChain.map(o => o.expiry_str))],
+      };
+    }
+
+    const summary = symbol
+      ? `Volatility Lab: ${symbol}${atmIV !== null ? ` · ATM IV ${(atmIV * 100).toFixed(1)}%` : ''}${histVolResult ? ` · Hist vol ${(histVolResult.full_period_vol * 100).toFixed(1)}%` : ''}`
+      : 'Volatility Lab: no asset loaded yet';
+
+    setWorkspaceContext({
+      menuId: 'volatility',
+      summary,
+      metrics,
+      suggestedQuestions: DEFAULT_SUGGESTED_QUESTIONS.volatility,
+      ...(symbol ? { rawData } : {}),
+    });
+  }, [symbol, atmIV, hestonParams, histVolResult, optionChain, calibResult, setWorkspaceContext]);
+}
 
 // ── Shared Data Source Panel ──────────────────────────────────────────────────
 function DataSourcePanel({ activeTab }: { activeTab: string }) {
@@ -126,6 +175,7 @@ function DataSourcePanel({ activeTab }: { activeTab: string }) {
 
 // ── Inner workspace ────────────────────────────────────────────────────────────
 function VolatilityWorkspaceInner() {
+  useVolatilityAgentSync();
   const location = useLocation();
 
   function getActiveTab() {
@@ -148,7 +198,7 @@ function VolatilityWorkspaceInner() {
             {meta.badge}
           </span>
         </div>
-        <p className="text-sm text-slate-400 ml-9">{meta.desc}</p>
+        <p className="text-sm text-slate-400 ml-9"><MathText text={meta.desc} /></p>
       </div>
 
       {/* Shared data source — hidden for VolDecomp which has its own multi-asset bar */}

@@ -9,6 +9,7 @@
  *   - Components needed for 80% variance threshold
  */
 import { useFactorContext } from '@/context/FactorContext';
+import { MathText } from '@/components/ui/Math';
 
 const pct = (v: number) => (v * 100).toFixed(1) + '%';
 
@@ -281,10 +282,10 @@ export const MLFactorPanel = () => {
       {/* Theory */}
       <div className="rounded-xl border border-slate-700 bg-slate-800/30 p-4 text-xs text-slate-500 space-y-1">
         <p className="font-semibold text-slate-300">PCA Latent Factor Extraction (M6 L2)</p>
-        <p>Standardise returns: R̃_it = (R_it − μ_i) / σ_i — remove scale effects.</p>
-        <p>Correlation matrix C = R̃^T R̃ / (T−1) — eigendecomposition → (λ_k, v_k).</p>
-        <p>PC_k = R̃ · v_k — kth latent factor time series (linear combination of asset returns).</p>
-        <p>Elbow rule: choose K where scree plot flattens. 80% rule: K such that Σλ_k ≥ 0.80 Σλ.</p>
+        <p><MathText text="Standardise: $\tilde{R}_{it} = (R_{it} - \mu_i)/\sigma_i$ — remove scale effects." /></p>
+        <p><MathText text="Correlation matrix $C = \tilde{R}^\top\tilde{R}/(T-1)$ — eigendecomposition $\to (\lambda_k, \mathbf{v}_k)$." /></p>
+        <p><MathText text="$\text{PC}_k = \tilde{R}\,\mathbf{v}_k$ — $k$-th latent factor time series (linear combination of returns)." /></p>
+        <p><MathText text="Elbow rule: choose $K$ where scree plot flattens. 80\% rule: $K$ s.t. $\sum_k\lambda_k \geq 0.80\sum\lambda$." /></p>
       </div>
     </div>
   );

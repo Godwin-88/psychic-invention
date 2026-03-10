@@ -4,7 +4,7 @@ import { TransactHeader } from './Transact/TransactHeader';
 
 const navLinks = [
   { label: 'Marketplace', to: '/marketplace' },
-  { label: 'Transact', to: '/transact' },
+  { label: 'Quantifire', to: '/transact' },
   { label: 'Workspace', to: '/workspace' },
   { label: 'API', to: '/api-playground' },
 ];
@@ -19,12 +19,12 @@ function LandingHeader() {
       <div className="container">
         <div className="flex items-center justify-between gap-6 py-4">
           <button onClick={() => navigate('/')} className="group flex items-center gap-3 text-left shrink-0">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white font-black text-sm shadow-lg shadow-blue-500/20">
-              T
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center text-lg shadow-lg shadow-orange-500/30">
+              🔥
             </div>
             <div>
-              <p className="text-base font-black text-white leading-none group-hover:text-blue-300 transition-colors">
-                TRANSACT
+              <p className="text-base font-black text-white leading-none group-hover:text-orange-300 transition-colors">
+                QUANTI<span className="text-orange-400">🔥</span>
               </p>
               <p className="text-[9px] text-slate-500 uppercase tracking-[0.25em] leading-none mt-0.5">
                 Quant Platform
