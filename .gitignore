@@ -1,6 +1,11 @@
 /target
 .vercel
 
+# Environment secrets — never commit
+.env
+.env.local
+.env.*.local
+
 # Course knowledgebase (PDFs / notebooks — kept local only)
 knowledgebase/
 
@@ -20,11 +25,11 @@ node_modules/
 # Build / Cache
 frontend/node_modules/.vite/
 
-# Algorithmic Trading Strategies (large PDFs)
+# Reference material — large PDFs kept local only
 AlgorithmicTradingStrategies/
-
-# Agentic Skills PDFs
-"agenticskills"/*.pdf
-"agenticskills"/**/*.pdf
-
 agenticskills/ref/
+agenticskills/**/*.pdf
+agenticskills/*.pdf
+
+# Any stray PDFs at repo root level
+/*.pdf
