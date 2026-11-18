@@ -160,12 +160,12 @@ pytest app/tests/test_pricing.py -v
 pytest app/tests/ --cov=app --cov-report=html
 
 # Rust tests
-cargo test
+cargo test --no-default-features
 
 # Property-based tests (Hypothesis + proptest)
 pytest app/tests/test_mathematical_consistency_properties.py -v
 pytest app/tests/test_deriv_api_properties.py -v
-cargo test --test greeks_property_tests
+cargo test --no-default-features --test greeks_property_tests
 ```
 
 ---

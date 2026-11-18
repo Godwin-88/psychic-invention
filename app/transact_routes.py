@@ -439,6 +439,7 @@ class KellyMultiRequest(BaseModel):
     returns: List[List[float]]  # T×N
     fractional: float = 1.0
     long_only: bool = True
+    max_leverage: float = 1.0  # cap on gross exposure; remainder held in cash
 
 
 @router.post("/optimize/blm")
@@ -526,9 +527,12 @@ def post_optimize_kelly(req: KellyMultiRequest):
             returns,
             fractional=req.fractional,
             long_only=req.long_only,
+            max_leverage=req.max_leverage,
         )
         return {
+            "model": "kelly_multi_asset",
             "weights": res.weights.tolist(),
+            "cash_weight": float(1.0 - res.weights.sum()),
             "expected_growth": res.expected_growth,
             "optimal_fraction": res.optimal_fraction,
             "fractional_kelly": res.fractional_kelly,

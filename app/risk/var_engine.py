@@ -43,7 +43,8 @@ def var_historical(
         portfolio_returns = returns.flatten()
 
     losses = -portfolio_returns * portfolio_value
-    q_alpha = np.percentile(losses, alpha * 100)
+    # VaR at confidence (1-α) is the (1-α)-quantile of the LOSS distribution
+    q_alpha = np.percentile(losses, (1 - alpha) * 100)
     var_1d = float(q_alpha)
 
     # ES: average of losses exceeding VaR
@@ -198,7 +199,7 @@ def var_monte_carlo(
         sim_portfolio = np.random.normal(mu, sigma, size=n_simulations)
 
     losses = -sim_portfolio * portfolio_value
-    var_1d = float(np.percentile(losses, alpha * 100))
+    var_1d = float(np.percentile(losses, (1 - alpha) * 100))
     tail = losses[losses >= var_1d]
     es_1d = float(np.mean(tail)) if len(tail) > 0 else var_1d
 

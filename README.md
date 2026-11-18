@@ -427,7 +427,7 @@ curl "http://127.0.0.1:8000/assets/options/AAPL?n_expiries=3&moneyness_range=0.2
 pytest app/tests/ -v
 
 # Rust tests
-cargo test
+cargo test --no-default-features
 
 # Frontend tests
 cd frontend && npm test
@@ -473,7 +473,7 @@ YFINANCE_RETRY=3
 
 ## 🤝 Contributing
 
-1. Ensure all tests pass: `pytest && cargo test && npm test`
+1. Ensure all tests pass: `pytest && cargo test --no-default-features && npm test`
 2. Run property-based tests for mathematical correctness
 3. Update API documentation if adding endpoints
 4. Update this README with new modules/features

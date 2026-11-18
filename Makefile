@@ -131,7 +131,7 @@ test-props: $(VENV_ACTIVATE)
 
 test-rust:
 	@echo -e "$(YELLOW)Running Rust tests...$(RESET)"
-	@cargo test
+	@cargo test --no-default-features
 	@echo -e "$(GREEN)Rust tests passed.$(RESET)"
 
 test-fe:

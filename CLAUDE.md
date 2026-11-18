@@ -79,10 +79,10 @@ pytest app/tests/test_mathematical_consistency_properties.py -v
 pytest app/tests/test_deriv_api_properties.py -v
 
 # Rust unit + integration
-cargo test
+cargo test --no-default-features   # pyo3 extension-module off so tests link
 
 # Rust property-based (proptest)
-cargo test --features proptest
+cargo test --no-default-features --features proptest
 
 # Performance benchmarks
 cargo bench

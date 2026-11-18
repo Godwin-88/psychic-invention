@@ -1,8 +1,11 @@
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from contextlib import asynccontextmanager
+from datetime import datetime
 from typing import Optional
 import logging
+import os
 import uuid
 import time
 
@@ -21,6 +24,20 @@ except ImportError:
     import pricing_engine_mock as pricing_engine
     USING_MOCK = True
     print("Warning: Using mock pricing engine for testing")
+
+# Fail closed: the mock returns plausible-looking but approximate prices
+# (e.g. its "Heston" is Black-Scholes with sigma = sqrt(v0)). Never serve it in
+# production unless explicitly allowed.
+APP_ENV = os.getenv("APP_ENV", "development").lower()
+if USING_MOCK and APP_ENV in ("production", "prod") and os.getenv(
+    "ALLOW_MOCK_ENGINE", ""
+).lower() not in ("1", "true", "yes"):
+    raise RuntimeError(
+        "Rust pricing_engine is not installed and APP_ENV=production. "
+        "Build it with `maturin build --release` and install the wheel, "
+        "or set ALLOW_MOCK_ENGINE=true to override (not recommended)."
+    )
+ENGINE = "mock" if USING_MOCK else "rust"
 
 # Import Redis cache
 try:
@@ -65,11 +82,31 @@ except ImportError as e:
 
 # Configure enhanced logging
 configure_logging(log_level="INFO", log_format="json")
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    yield
+    # Shutdown: close each optional resource independently so one failure
+    # (or one missing module) does not skip the others.
+    if MARKET_DATA_AVAILABLE:
+        try:
+            await cleanup_deriv_client()
+        except Exception:
+            logger.exception("Error closing Deriv API client")
+    if REDIS_AVAILABLE:
+        try:
+            await close_cache()
+        except Exception:
+            logger.exception("Error closing Redis cache")
+
 
 app = FastAPI(
     title="Derivatives Pricing Engine",
     version="1.0.0",
-    description="High-performance derivatives pricing engine with comprehensive error handling and monitoring"
+    description="High-performance derivatives pricing engine with comprehensive error handling and monitoring",
+    lifespan=lifespan,
 )
 
 # Request ID middleware — defined first so CORS (added after) is outermost.
@@ -85,7 +122,13 @@ async def add_request_id(request: Request, call_next):
         response = await call_next(request)
     except Exception:
         from fastapi.responses import JSONResponse
-        response = JSONResponse(status_code=500, content={"detail": "Internal server error"})
+        logger.exception(
+            "Unhandled exception", extra={"request_id": request_id, "path": request.url.path}
+        )
+        response = JSONResponse(
+            status_code=500,
+            content={"detail": "Internal server error", "request_id": request_id},
+        )
     process_time = time.time() - start_time
 
     response.headers["X-Request-ID"] = request_id
@@ -111,12 +154,6 @@ if MARKET_DATA_AVAILABLE:
 # Include Transact Phase 1 router
 if TRANSACT_AVAILABLE:
     app.include_router(transact_router)
-    # Add cleanup handler
-    @app.on_event("shutdown")
-    async def shutdown_event():
-        await cleanup_deriv_client()
-        if REDIS_AVAILABLE:
-            await close_cache()
 
 # Include Asset Universe (yfinance) router
 if ASSET_UNIVERSE_AVAILABLE:
@@ -237,7 +274,7 @@ class HestonGreeksRequest(BaseModel):
 
 @app.get("/")
 def root():
-    return {"message": "Derivatives Pricing Engine API"}
+    return {"message": "Derivatives Pricing Engine API", "engine": ENGINE}
 
 # ===== BLACK-SCHOLES ENDPOINTS =====
 @app.post("/price/call/bs")
