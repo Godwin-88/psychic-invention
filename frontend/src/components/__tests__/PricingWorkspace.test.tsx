@@ -1,625 +1,222 @@
-import { render, screen, fireEvent } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+/**
+ * PricingWorkspace — multi-model pricer (BS · FFT · Heston) with live quotes.
+ *
+ * Replaces the previous suites (PricingWorkspace / ResultsDisplay /
+ * CompleteSystemIntegration), which targeted an older tabbed UI that no
+ * longer exists.
+ */
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { PricingWorkspace } from '../PricingWorkspace';
+import { DataProviderProvider } from '@/context/DataProviderContext';
+import { computeCallGreeks, computePutGreeks } from '@/utils/greeks';
+import * as api from '@/utils/api';
 
-// Mock the API hooks with simple implementations
-const mockBSCalculate = vi.fn();
-const mockFFTCalculate = vi.fn();
-
-vi.mock('@/hooks/useApi', () => ({
-  useBlackScholesPricing: () => ({
-    calculate: mockBSCalculate,
-    loading: false,
-    error: null,
-    result: null,
-  }),
-  useFFTPricing: () => ({
-    calculate: mockFFTCalculate,
-    loading: false,
-    error: null,
-    result: null,
-  }),
+vi.mock('@/utils/api', () => ({
+  priceCallBS: vi.fn(),
+  pricePutBS: vi.fn(),
+  priceCallFFTOpt: vi.fn(),
+  pricePutFFTOpt: vi.fn(),
+  priceCallHeston: vi.fn(),
+  pricePutHeston: vi.fn(),
+  getAssetQuote: vi.fn(),
+  getAssetOptions: vi.fn(),
 }));
 
-// Mock the Greeks utility
-vi.mock('@/utils/greeks', () => ({
-  computeCallGreeks: vi.fn(() => ({
-    delta: 0.5,
-    gamma: 0.01,
-    theta: -0.05,
-    vega: 0.2,
-    rho: 0.1,
-  })),
+// KaTeX rendering is irrelevant here and slow in jsdom.
+vi.mock('@/components/ui/Math', () => ({
+  MathBlock: ({ latex }: { latex: string }) => <code data-testid="math">{latex}</code>,
 }));
 
-// Mock the export utilities
-vi.mock('@/utils/export', () => ({
-  exportBlackScholesCSV: vi.fn(),
-  exportBlackScholesJSON: vi.fn(),
-  exportFFTSurfaceCSV: vi.fn(),
-  exportFFTSurfaceJSON: vi.fn(),
-  exportFFTCompleteJSON: vi.fn(),
-}));
+const m = vi.mocked(api);
 
-describe('PricingWorkspace Form Validation', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+const renderWorkspace = () =>
+  render(
+    <DataProviderProvider>
+      <PricingWorkspace />
+    </DataProviderProvider>,
+  );
 
-  describe('Black-Scholes Form Validation', () => {
-    it('should render all required input fields', () => {
-      render(<PricingWorkspace />);
-      
-      // Check that all Black-Scholes input fields are present by their default values
-      expect(screen.getByDisplayValue('100')).toBeInTheDocument(); // s (spot price)
-      expect(screen.getByDisplayValue('1')).toBeInTheDocument(); // tau (time to expiration)
-      expect(screen.getByDisplayValue('0.05')).toBeInTheDocument(); // r (risk-free rate)
-      expect(screen.getByDisplayValue('0.2')).toBeInTheDocument(); // sigma (volatility)
-      
-      // Check for labels (uppercase as shown in component)
-      expect(screen.getByText('S')).toBeInTheDocument();
-      expect(screen.getByText('K')).toBeInTheDocument();
-      expect(screen.getByText('TAU')).toBeInTheDocument();
-      expect(screen.getByText('R')).toBeInTheDocument();
-      expect(screen.getByText('SIGMA')).toBeInTheDocument();
-    });
+const priceButton = () => screen.getByRole('button', { name: /Price All Models/ });
 
-    it('should accept valid numerical inputs', async () => {
-      const user = userEvent.setup();
-      render(<PricingWorkspace />);
-      
-      // Find the spot price input (first input with value 100)
-      const inputs = screen.getAllByDisplayValue('100');
-      const spotPriceInput = inputs[0]; // First one should be spot price
-      
-      await user.clear(spotPriceInput);
-      await user.type(spotPriceInput, '105.50');
-      
-      expect(spotPriceInput).toHaveValue(105.50);
-    });
+/** Inputs in render order: S, K, τ, r, σ (then Heston fields when expanded). */
+const numberInputs = () => screen.getAllByRole('spinbutton') as HTMLInputElement[];
 
-    it('should handle invalid numerical inputs gracefully', async () => {
-      const user = userEvent.setup();
-      render(<PricingWorkspace />);
-      
-      const inputs = screen.getAllByDisplayValue('100');
-      const spotPriceInput = inputs[0];
-      
-      await user.clear(spotPriceInput);
-      await user.type(spotPriceInput, 'invalid');
-      
-      // The component should handle invalid input by setting value to 0
-      expect(spotPriceInput).toHaveValue(0);
-    });
-
-    it('should validate negative values for spot price', async () => {
-      const user = userEvent.setup();
-      render(<PricingWorkspace />);
-      
-      const inputs = screen.getAllByDisplayValue('100');
-      const spotPriceInput = inputs[0];
-      
-      await user.clear(spotPriceInput);
-      await user.type(spotPriceInput, '-50');
-      
-      // Component accepts negative values but this would be caught by backend validation
-      expect(spotPriceInput).toHaveValue(-50);
-    });
-
-    it('should validate zero values', async () => {
-      const user = userEvent.setup();
-      render(<PricingWorkspace />);
-      
-      const volatilityInput = screen.getByDisplayValue('0.2');
-      
-      await user.clear(volatilityInput);
-      await user.type(volatilityInput, '0');
-      
-      expect(volatilityInput).toHaveValue(0);
-    });
-
-    it('should handle decimal inputs correctly', async () => {
-      const user = userEvent.setup();
-      render(<PricingWorkspace />);
-      
-      const volatilityInput = screen.getByDisplayValue('0.2');
-      
-      await user.clear(volatilityInput);
-      await user.type(volatilityInput, '0.35');
-      
-      expect(volatilityInput).toHaveValue(0.35);
-    });
-
-    it('should display calculation button', () => {
-      render(<PricingWorkspace />);
-      
-      const calculateButton = screen.getByText('Calculate Call & Put');
-      expect(calculateButton).toBeInTheDocument();
-      expect(calculateButton).toHaveAttribute('type', 'submit');
-    });
-
-    it('should have correct input types and attributes', () => {
-      render(<PricingWorkspace />);
-      
-      // Get all number inputs
-      const numberInputs = screen.getAllByRole('spinbutton');
-      
-      // Should have at least 5 inputs for Black-Scholes parameters
-      expect(numberInputs.length).toBeGreaterThanOrEqual(5);
-      
-      numberInputs.forEach((input: HTMLElement) => {
-        expect(input).toHaveAttribute('type', 'number');
-        expect(input).toHaveAttribute('step', '0.01');
-      });
-    });
-  });
-
-  describe('FFT Form Validation', () => {
-    beforeEach(() => {
-      render(<PricingWorkspace />);
-      // Switch to FFT tab
-      const fftTab = screen.getByText('Surface · Carr-Madan FFT');
-      fireEvent.click(fftTab);
-    });
-
-    it('should render FFT-specific input fields', () => {
-      // Check for FFT-specific fields
-      expect(screen.getByDisplayValue('1.5')).toBeInTheDocument(); // alpha
-      expect(screen.getByDisplayValue('0.01')).toBeInTheDocument(); // delta_v
-      expect(screen.getByDisplayValue('2048')).toBeInTheDocument(); // n
-      
-      // Check for labels (with Greek letters and descriptions)
-      expect(screen.getByText('Α (DAMPING)')).toBeInTheDocument();
-      expect(screen.getByText('ΔV (FREQUENCY)')).toBeInTheDocument();
-      expect(screen.getByText('GRID (N)')).toBeInTheDocument();
-    });
-
-    it('should validate alpha parameter bounds', async () => {
-      const user = userEvent.setup();
-      
-      const alphaInput = screen.getByDisplayValue('1.5');
-      
-      await user.clear(alphaInput);
-      await user.type(alphaInput, '0.3');
-      
-      expect(alphaInput).toHaveValue(0.3);
-      // Note: The component has min="0.5" but doesn't enforce it in onChange
-    });
-
-    it('should validate delta_v parameter bounds', async () => {
-      const user = userEvent.setup();
-      
-      const deltaVInput = screen.getByDisplayValue('0.01');
-      
-      await user.clear(deltaVInput);
-      await user.type(deltaVInput, '0.0005');
-      
-      expect(deltaVInput).toHaveValue(0.0005);
-      // Note: The component has min="0.001" but doesn't enforce it in onChange
-    });
-
-    it('should provide grid size options', () => {
-      const gridSelect = screen.getByDisplayValue('2048');
-      expect(gridSelect).toBeInTheDocument();
-      
-      // Check that options are available
-      const options = screen.getAllByRole('option');
-      const gridOptions = options.filter((option: HTMLElement) => 
-        ['1024', '2048', '4096'].includes(option.textContent || '')
-      );
-      expect(gridOptions).toHaveLength(3);
-    });
-
-    it('should display derived parameters as read-only', () => {
-      // Check for derived parameters (they should be disabled)
-      const allInputs = screen.getAllByRole('textbox');
-      const disabledInputs = allInputs.filter((input: HTMLElement) => input.hasAttribute('disabled'));
-      
-      // Should have at least 2 derived parameters (delta_k and k_min)
-      expect(disabledInputs.length).toBeGreaterThanOrEqual(2);
-    });
-
-    it('should display FFT generation button', () => {
-      const generateButton = screen.getByText('Generate FFT Surface');
-      expect(generateButton).toBeInTheDocument();
-    });
-
-    it('should have correct step values for FFT parameters', () => {
-      const alphaInput = screen.getByDisplayValue('1.5');
-      expect(alphaInput).toHaveAttribute('step', '0.1');
-      expect(alphaInput).toHaveAttribute('min', '0.5');
-      
-      const deltaVInput = screen.getByDisplayValue('0.01');
-      expect(deltaVInput).toHaveAttribute('step', '0.001');
-      expect(deltaVInput).toHaveAttribute('min', '0.001');
-    });
-  });
-
-  describe('Tab Switching Validation', () => {
-    it('should switch between Black-Scholes and FFT tabs', () => {
-      render(<PricingWorkspace />);
-      
-      // Initially on Black-Scholes tab
-      expect(screen.getByText('Calculate Call & Put')).toBeInTheDocument();
-      
-      // Switch to FFT tab
-      const fftTab = screen.getByText('Surface · Carr-Madan FFT');
-      fireEvent.click(fftTab);
-      
-      expect(screen.getByText('Generate FFT Surface')).toBeInTheDocument();
-      
-      // Switch back to Black-Scholes tab
-      const bsTab = screen.getByText('Analytical · Black-Scholes');
-      fireEvent.click(bsTab);
-      
-      expect(screen.getByText('Calculate Call & Put')).toBeInTheDocument();
-    });
-
-    it('should maintain separate state for each tab', async () => {
-      const user = userEvent.setup();
-      render(<PricingWorkspace />);
-      
-      // Modify Black-Scholes spot price
-      const bsInputs = screen.getAllByDisplayValue('100');
-      const bsSpotInput = bsInputs[0];
-      await user.clear(bsSpotInput);
-      await user.type(bsSpotInput, '110');
-      
-      // Switch to FFT tab
-      const fftTab = screen.getByText('Surface · Carr-Madan FFT');
-      fireEvent.click(fftTab);
-      
-      // FFT should have its own spot price value (still 100)
-      const fftInputs = screen.getAllByDisplayValue('100');
-      expect(fftInputs.length).toBeGreaterThan(0); // Should find FFT spot price with default value
-      
-      // Switch back to Black-Scholes
-      const bsTab = screen.getByText('Analytical · Black-Scholes');
-      fireEvent.click(bsTab);
-      
-      // Black-Scholes should maintain its modified value
-      const modifiedInputs = screen.getAllByDisplayValue('110');
-      expect(modifiedInputs.length).toBeGreaterThan(0); // Should find the modified value
-    });
-  });
-
-  describe('Form Structure Validation', () => {
-    it('should have proper form structure for Black-Scholes', () => {
-      render(<PricingWorkspace />);
-      
-      // Should have a form element
-      const forms = screen.getAllByRole('form');
-      expect(forms.length).toBeGreaterThan(0);
-    });
-
-    it('should display proper labels for all inputs', () => {
-      render(<PricingWorkspace />);
-      
-      // Check that all required labels are present
-      const requiredLabels = ['S', 'K', 'TAU', 'R', 'SIGMA'];
-      requiredLabels.forEach(label => {
-        expect(screen.getByText(label)).toBeInTheDocument();
-      });
-    });
-
-    it('should have accessible input elements', () => {
-      render(<PricingWorkspace />);
-      
-      // All number inputs should be accessible
-      const numberInputs = screen.getAllByRole('spinbutton');
-      numberInputs.forEach((input: HTMLElement) => {
-        expect(input).toBeInTheDocument();
-        expect(input).not.toBeDisabled(); // Should not be disabled by default
-      });
-    });
-  });
-});
-
-describe('Results Display Components', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  describe('Black-Scholes Results Display', () => {
-    it('should display empty state when no results are available', () => {
-      render(<PricingWorkspace />);
-      
-      // Should show empty state message
-      expect(screen.getByText('Awaiting calculation...')).toBeInTheDocument();
-      expect(screen.getByText('Send a payload and results will render here.')).toBeInTheDocument();
-    });
-
-    it('should display Black-Scholes pricing results with proper formatting', () => {
-      // Create a component with mocked results by passing props
-      const MockedPricingWorkspace = () => {
-        const mockResult = {
-          callPrice: 12.3456,
-          putPrice: 8.7654,
-          model: 'BlackScholes',
-          responseTime: 45
-        };
-
-        // Mock the hook implementation for this test
-        vi.doMock('@/hooks/useApi', () => ({
-          useBlackScholesPricing: () => ({
-            calculate: mockBSCalculate,
-            loading: false,
-            error: null,
-            result: mockResult,
-          }),
-          useFFTPricing: () => ({
-            calculate: mockFFTCalculate,
-            loading: false,
-            error: null,
-            result: null,
-          }),
-        }));
-
-        return <PricingWorkspace />;
-      };
-
-      render(<MockedPricingWorkspace />);
-      
-      // Check that results section exists (even if mocked data doesn't show)
-      // This tests the component structure for results display
-      expect(screen.getByText('Awaiting calculation...')).toBeInTheDocument();
-    });
-
-    it('should display loading state during calculation', () => {
-      // Mock loading state
-      vi.doMock('@/hooks/useApi', () => ({
-        useBlackScholesPricing: () => ({
-          calculate: mockBSCalculate,
-          loading: true,
-          error: null,
-          result: null,
-        }),
-        useFFTPricing: () => ({
-          calculate: mockFFTCalculate,
-          loading: false,
-          error: null,
-          result: null,
-        }),
-      }));
-
-      render(<PricingWorkspace />);
-      
-      // Should still show empty state in results area when loading
-      expect(screen.getByText('Awaiting calculation...')).toBeInTheDocument();
-      
-      // Check that calculate button exists (loading state would be on the button)
-      expect(screen.getByText('Calculate Call & Put')).toBeInTheDocument();
-    });
-
-    it('should display error state when calculation fails', () => {
-      // Mock error state
-      vi.doMock('@/hooks/useApi', () => ({
-        useBlackScholesPricing: () => ({
-          calculate: mockBSCalculate,
-          loading: false,
-          error: 'Invalid parameters provided',
-          result: null,
-        }),
-        useFFTPricing: () => ({
-          calculate: mockFFTCalculate,
-          loading: false,
-          error: null,
-          result: null,
-        }),
-      }));
-
-      render(<PricingWorkspace />);
-      
-      // Should still show empty state in results area when there's an error
-      expect(screen.getByText('Awaiting calculation...')).toBeInTheDocument();
-    });
-
-    it('should have proper structure for results display', () => {
-      render(<PricingWorkspace />);
-      
-      // Check that the results area exists and has proper structure
-      expect(screen.getByText('Awaiting calculation...')).toBeInTheDocument();
-      expect(screen.getByText('Send a payload and results will render here.')).toBeInTheDocument();
-      
-      // The component should have the structure to display results when available
-      // This tests the component's ability to render results in the correct format
-    });
-  });
-
-  describe('FFT Results Display', () => {
-    beforeEach(() => {
-      render(<PricingWorkspace />);
-      // Switch to FFT tab
-      const fftTab = screen.getByText('Surface · Carr-Madan FFT');
-      fireEvent.click(fftTab);
-    });
-
-    it('should display empty state when no FFT results are available', () => {
-      // Should show FFT-specific empty state
-      expect(screen.getByText('Generate an FFT grid to view surface data.')).toBeInTheDocument();
-      expect(screen.getByText('We recommend n=2048, α=1.5 for stability.')).toBeInTheDocument();
-    });
-
-    it('should display FFT loading state during calculation', () => {
-      // Mock loading state for FFT
-      vi.doMock('@/hooks/useApi', () => ({
-        useBlackScholesPricing: () => ({
-          calculate: mockBSCalculate,
-          loading: false,
-          error: null,
-          result: null,
-        }),
-        useFFTPricing: () => ({
-          calculate: mockFFTCalculate,
-          loading: true,
-          error: null,
-          result: null,
-        }),
-      }));
-
-      render(<PricingWorkspace />);
-      const fftTab = screen.getByText('Surface · Carr-Madan FFT');
-      fireEvent.click(fftTab);
-      
-      // Should show empty state during loading
-      expect(screen.getByText('Generate an FFT grid to view surface data.')).toBeInTheDocument();
-    });
-
-    it('should display FFT error state when calculation fails', () => {
-      // Mock error state for FFT
-      vi.doMock('@/hooks/useApi', () => ({
-        useBlackScholesPricing: () => ({
-          calculate: mockBSCalculate,
-          loading: false,
-          error: null,
-          result: null,
-        }),
-        useFFTPricing: () => ({
-          calculate: mockFFTCalculate,
-          loading: false,
-          error: 'FFT calculation failed: numerical instability',
-          result: null,
-        }),
-      }));
-
-      render(<PricingWorkspace />);
-      const fftTab = screen.getByText('Surface · Carr-Madan FFT');
-      fireEvent.click(fftTab);
-      
-      // Should show empty state when there's an error
-      expect(screen.getByText('Generate an FFT grid to view surface data.')).toBeInTheDocument();
-    });
-
-    it('should have proper structure for FFT results display', () => {
-      // Check that the FFT results area has proper structure
-      expect(screen.getByText('Generate an FFT grid to view surface data.')).toBeInTheDocument();
-      
-      // Check that the component has the structure to display FFT results
-      // This includes the option chain table structure
-      expect(screen.getByText('We recommend n=2048, α=1.5 for stability.')).toBeInTheDocument();
-    });
-  });
-
-  describe('Results Formatting and Precision', () => {
-    it('should have consistent formatting structure for prices', () => {
-      render(<PricingWorkspace />);
-      
-      // Test that the component has the proper structure for displaying formatted prices
-      // The actual formatting is tested when results are available
-      expect(screen.getByText('Awaiting calculation...')).toBeInTheDocument();
-    });
-
-    it('should have consistent formatting structure for Greeks', () => {
-      render(<PricingWorkspace />);
-      
-      // Test that the component has the proper structure for displaying Greeks
-      // The actual Greek formatting is tested when results are available
-      expect(screen.getByText('Awaiting calculation...')).toBeInTheDocument();
-    });
-
-    it('should have consistent formatting structure for FFT results', () => {
-      render(<PricingWorkspace />);
-      const fftTab = screen.getByText('Surface · Carr-Madan FFT');
-      fireEvent.click(fftTab);
-      
-      // Test that the FFT component has proper structure for formatted results
-      expect(screen.getByText('Generate an FFT grid to view surface data.')).toBeInTheDocument();
-    });
-  });
-
-  describe('Results Table Structure', () => {
-    it('should have proper structure for Black-Scholes results display', () => {
-      render(<PricingWorkspace />);
-      
-      // Check that results area exists with proper structure
-      expect(screen.getByText('Awaiting calculation...')).toBeInTheDocument();
-      
-      // The component should be structured to display results in tiles/cards
-      // This tests the component's readiness to display results properly
-    });
-
-    it('should have proper structure for FFT table display', () => {
-      render(<PricingWorkspace />);
-      const fftTab = screen.getByText('Surface · Carr-Madan FFT');
-      fireEvent.click(fftTab);
-      
-      // Check that FFT results area has proper structure for table display
-      expect(screen.getByText('Generate an FFT grid to view surface data.')).toBeInTheDocument();
-      
-      // The component should be structured to display results in a table format
-      // This tests the component's readiness to display FFT results properly
-    });
-  });
-
-  describe('Export Functionality Integration', () => {
-    it('should have export button structure for Black-Scholes results', () => {
-      render(<PricingWorkspace />);
-      
-      // Test that the component has the structure for export functionality
-      // Export buttons would appear when results are available
-      expect(screen.getByText('Awaiting calculation...')).toBeInTheDocument();
-    });
-
-    it('should have export button structure for FFT results', () => {
-      render(<PricingWorkspace />);
-      const fftTab = screen.getByText('Surface · Carr-Madan FFT');
-      fireEvent.click(fftTab);
-      
-      // Test that the FFT component has structure for export functionality
-      expect(screen.getByText('Generate an FFT grid to view surface data.')).toBeInTheDocument();
-    });
-  });
-
-  describe('Results Display Accessibility', () => {
-    it('should have accessible structure for Black-Scholes results', () => {
-      render(<PricingWorkspace />);
-      
-      // Test accessibility of results display structure
-      expect(screen.getByText('Awaiting calculation...')).toBeInTheDocument();
-      
-      // The component should have proper ARIA labels and structure for screen readers
-    });
-
-    it('should have accessible structure for FFT results table', () => {
-      render(<PricingWorkspace />);
-      const fftTab = screen.getByText('Surface · Carr-Madan FFT');
-      fireEvent.click(fftTab);
-      
-      // Test accessibility of FFT table structure
-      expect(screen.getByText('Generate an FFT grid to view surface data.')).toBeInTheDocument();
-      
-      // The component should have proper table headers and structure for accessibility
-    });
-  });
-});
-
-// Manual test function for browser console testing
-export function testPricingFormValidation() {
-  console.log('Testing pricing form validation...');
-  
-  try {
-    // Test input validation scenarios
-    const testCases = [
-      { field: 's', value: '105.50', expected: 105.50, description: 'Valid spot price' },
-      { field: 'k', value: '100', expected: 100, description: 'Valid strike price' },
-      { field: 'tau', value: '0.25', expected: 0.25, description: 'Valid time to expiration' },
-      { field: 'r', value: '0.05', expected: 0.05, description: 'Valid risk-free rate' },
-      { field: 'sigma', value: '0.2', expected: 0.2, description: 'Valid volatility' },
-      { field: 's', value: 'invalid', expected: 0, description: 'Invalid text input' },
-      { field: 's', value: '-50', expected: -50, description: 'Negative value' },
-      { field: 'sigma', value: '0', expected: 0, description: 'Zero volatility' },
-    ];
-    
-    testCases.forEach(testCase => {
-      console.log(`Testing ${testCase.description}: ${testCase.field} = ${testCase.value}`);
-      // In a real browser environment, this would interact with the actual form
-    });
-    
-    console.log('All pricing form validation tests completed!');
-    return true;
-  } catch (error) {
-    console.error('Pricing form validation test failed:', error);
-    return false;
+function mockPrices({ heston = true } = {}) {
+  m.priceCallBS.mockResolvedValue({ price: 4.6150, model: 'Black-Scholes' } as never);
+  m.pricePutBS.mockResolvedValue({ price: 3.3728, model: 'Black-Scholes' } as never);
+  m.priceCallFFTOpt.mockResolvedValue({ price: 4.6151, model: 'FFT' } as never);
+  m.pricePutFFTOpt.mockResolvedValue({ price: 3.3729, model: 'FFT' } as never);
+  if (heston) {
+    m.priceCallHeston.mockResolvedValue({ price: 4.4000, model: 'Heston' } as never);
+    m.pricePutHeston.mockResolvedValue({ price: 3.1600, model: 'Heston' } as never);
   }
 }
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  window.localStorage.clear();
+});
+
+describe('PricingWorkspace — inputs and client-side Greeks', () => {
+  it('renders the five option parameters with defaults', () => {
+    renderWorkspace();
+    const [s, k, tau, r, sigma] = numberInputs();
+    expect(s.value).toBe('100');
+    expect(k.value).toBe('100');
+    expect(tau.value).toBe('0.25');
+    expect(r.value).toBe('0.05');
+    expect(sigma.value).toBe('0.2');
+    expect(screen.getByText('S (Spot)')).toBeInTheDocument();
+    expect(screen.getByText('σ (Vol)')).toBeInTheDocument();
+  });
+
+  it('shows Black-Scholes Greeks immediately, without a request', () => {
+    renderWorkspace();
+    const expected = computeCallGreeks({ s: 100, k: 100, tau: 0.25, r: 0.05, sigma: 0.2 });
+    expect(screen.getByText(expected.delta.toFixed(4))).toBeInTheDocument();
+    expect(screen.getByText(expected.gamma.toFixed(4))).toBeInTheDocument();
+    expect(m.priceCallBS).not.toHaveBeenCalled();
+  });
+
+  it('switches Greeks to the put when Put is selected', () => {
+    renderWorkspace();
+    fireEvent.click(screen.getByRole('button', { name: 'put' }));
+    const put = computePutGreeks({ s: 100, k: 100, tau: 0.25, r: 0.05, sigma: 0.2 });
+    expect(screen.getByText(put.delta.toFixed(4))).toBeInTheDocument();
+    expect(screen.getByText(/Greeks · BS put/)).toBeInTheDocument();
+  });
+
+  it('recomputes Greeks when an input changes', () => {
+    renderWorkspace();
+    fireEvent.change(numberInputs()[0], { target: { value: '110' } });
+    const expected = computeCallGreeks({ s: 110, k: 100, tau: 0.25, r: 0.05, sigma: 0.2 });
+    expect(screen.getByText(expected.delta.toFixed(4))).toBeInTheDocument();
+  });
+
+  it('expands the Heston parameters and flags a Feller violation', () => {
+    renderWorkspace();
+    fireEvent.click(screen.getByRole('button', { name: /Heston Parameters/ }));
+    expect(numberInputs()).toHaveLength(10);
+    expect(screen.queryByText(/Feller: 2κθ/)).not.toBeInTheDocument();
+    // ξ (vol-of-vol) is the 9th input: 2κθ = 0.16 < ξ² = 0.36
+    fireEvent.change(numberInputs()[8], { target: { value: '0.6' } });
+    expect(screen.getByText(/Feller: 2κθ/)).toBeInTheDocument();
+  });
+});
+
+describe('PricingWorkspace — pricing all models', () => {
+  it('prices calls and puts with BS, FFT and Heston and shows a card for each', async () => {
+    mockPrices();
+    renderWorkspace();
+    fireEvent.click(priceButton());
+
+    // "Black-Scholes" also labels the static theory box, so wait on result-only text.
+    await screen.findByText('Heston SV');
+    expect(screen.getByText('FFT (Carr-Madan)')).toBeInTheDocument();
+    expect(screen.getByText('Analytical · Closed-form')).toBeInTheDocument();
+    expect(screen.getAllByText('$4.6150').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('$4.4000').length).toBeGreaterThan(0);
+
+    const bsArgs = { s: 100, k: 100, tau: 0.25, r: 0.05, sigma: 0.2 };
+    expect(m.priceCallBS).toHaveBeenCalledWith(bsArgs);
+    expect(m.pricePutFFTOpt).toHaveBeenCalledWith(bsArgs);
+    expect(m.priceCallHeston).toHaveBeenCalledWith(
+      expect.objectContaining({ ...bsArgs, v0: 0.04, kappa: 2, theta: 0.04, sigma_v: 0.3, rho: -0.7 }),
+    );
+  });
+
+  it('reports model agreement against Black-Scholes', async () => {
+    mockPrices();
+    renderWorkspace();
+    fireEvent.click(priceButton());
+    const heading = await screen.findByText(/Model Agreement/);
+    const panel = heading.closest('div') as HTMLElement;
+    expect(within(panel).getByText(/FFT \(Carr-Madan\) deviation/)).toBeInTheDocument();
+    // FFT within 1% of BS; Heston 4.4 vs 4.615 is 4.66% (< 5% threshold)
+    expect(within(panel).getAllByText('✓ agree')).toHaveLength(2);
+  });
+
+  it('skips Heston and explains why when the Feller condition fails', async () => {
+    mockPrices({ heston: false });
+    renderWorkspace();
+    fireEvent.click(screen.getByRole('button', { name: /Heston Parameters/ }));
+    fireEvent.change(numberInputs()[8], { target: { value: '0.6' } });
+    fireEvent.click(priceButton());
+
+    await screen.findByText('FFT (Carr-Madan)');
+    expect(screen.queryByText('Heston SV')).not.toBeInTheDocument();
+    expect(m.priceCallHeston).not.toHaveBeenCalled();
+    expect(screen.getByText(/Feller condition violated.*Heston skipped/)).toBeInTheDocument();
+  });
+
+  it('rejects non-positive inputs without calling the API', async () => {
+    renderWorkspace();
+    fireEvent.change(numberInputs()[4], { target: { value: '0' } });
+    fireEvent.click(priceButton());
+    expect(await screen.findByText('S, K, τ, σ must all be positive')).toBeInTheDocument();
+    expect(m.priceCallBS).not.toHaveBeenCalled();
+  });
+
+  it('shows the API error when pricing fails', async () => {
+    mockPrices();
+    m.priceCallBS.mockRejectedValue(new Error('Backend unavailable'));
+    renderWorkspace();
+    fireEvent.click(priceButton());
+    expect(await screen.findByText('Backend unavailable')).toBeInTheDocument();
+    expect(screen.queryByText('FFT (Carr-Madan)')).not.toBeInTheDocument();
+  });
+});
+
+describe('PricingWorkspace — live quote', () => {
+  it('fills S, K and σ from the quote and the nearest-ATM implied vol', async () => {
+    m.getAssetQuote.mockResolvedValue({ symbol: 'AAPL', spot: 187.42, name: 'Apple Inc.', currency: 'USD' });
+    m.getAssetOptions.mockResolvedValue({
+      symbol: 'AAPL', spot: 187.42, n_contracts: 2,
+      contracts: [
+        { moneyness: 0.1, implied_vol: 0.4 },
+        { moneyness: 0.01, implied_vol: 0.27 },
+      ],
+    } as never);
+    renderWorkspace();
+
+    fireEvent.change(screen.getByPlaceholderText(/Symbol/), { target: { value: 'aapl' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Load Quote' }));
+
+    await screen.findByText('Apple Inc.');
+    const [s, k, , , sigma] = numberInputs();
+    expect(s.value).toBe('187.42');
+    expect(k.value).toBe('187');
+    expect(sigma.value).toBe('0.27');
+    // the selected data provider is passed through (default yfinance)
+    expect(m.getAssetQuote).toHaveBeenCalledWith('AAPL', 'yfinance');
+    expect(m.getAssetOptions).toHaveBeenCalledWith('AAPL', 2, 0.2, 'yfinance');
+  });
+
+  it('shows an error for an unknown symbol', async () => {
+    m.getAssetQuote.mockRejectedValue(new Error('404'));
+    m.getAssetOptions.mockResolvedValue(null as never);
+    renderWorkspace();
+    fireEvent.change(screen.getByPlaceholderText(/Symbol/), { target: { value: 'ZZZZ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Load Quote' }));
+    expect(await screen.findByText('Could not load quote for ZZZZ. Check symbol.')).toBeInTheDocument();
+  });
+
+  it('disables Load Quote until a symbol is entered', () => {
+    renderWorkspace();
+    expect(screen.getByRole('button', { name: 'Load Quote' })).toBeDisabled();
+  });
+});
+
+describe('PricingWorkspace — loading state', () => {
+  it('disables the price button while requests are in flight', async () => {
+    let resolve!: (v: unknown) => void;
+    mockPrices();
+    m.priceCallBS.mockReturnValue(new Promise(r => { resolve = r; }) as never);
+    renderWorkspace();
+    fireEvent.click(priceButton());
+    expect(screen.getByRole('button', { name: /Pricing all models/ })).toBeDisabled();
+    resolve({ price: 4.615 });
+    await waitFor(() => expect(priceButton()).not.toBeDisabled());
+  });
+});

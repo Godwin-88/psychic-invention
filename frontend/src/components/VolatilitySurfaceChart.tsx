@@ -158,6 +158,8 @@ export const VolatilitySurfaceChart: React.FC<VolatilitySurfaceChartProps> = ({
         ref={canvasRef}
         width={width}
         height={height}
+        role="img"
+        aria-label="Implied volatility surface by strike and expiration"
         className="max-w-full h-auto"
       />
     </div>

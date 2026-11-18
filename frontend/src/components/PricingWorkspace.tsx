@@ -79,8 +79,8 @@ export const PricingWorkspace = ({ defaultTab: _tab = 'bs' }: { defaultTab?: str
     setError(null);
     try {
       const [quote, opts] = await Promise.all([
-        getAssetQuote(sym),
-        getAssetOptions(sym, 2, 0.20).catch(() => null),
+        getAssetQuote(sym, dataProvider),
+        getAssetOptions(sym, 2, 0.20, dataProvider).catch(() => null),
       ]);
       setQuoteInfo({ spot: quote.spot, name: quote.name });
       const spot = quote.spot;

@@ -94,7 +94,7 @@ describe('OptionChainDisplay', () => {
       />
     );
     
-    expect(screen.getByText('Spot: $100.00')).toBeInTheDocument();
+    expect(screen.getByText(/Spot: \$100\.00/)).toBeInTheDocument();
     
     // Check moneyness labels
     expect(screen.getByText('(ITM)')).toBeInTheDocument(); // 95 strike
@@ -114,9 +114,10 @@ describe('OptionChainDisplay', () => {
     expect(screen.getAllByText('IV')).toHaveLength(2); // Call IV and Put IV
     
     // Check IV values
-    expect(screen.getByText('22.0%')).toBeInTheDocument();
-    expect(screen.getByText('21.0%')).toBeInTheDocument();
-    expect(screen.getByText('20.0%')).toBeInTheDocument();
+    // 95 strike: call 22% / put 21%; 100: 20% / 20%; 105: call 21% / put 22%
+    expect(screen.getAllByText('22.0%')).toHaveLength(2);
+    expect(screen.getAllByText('21.0%')).toHaveLength(2);
+    expect(screen.getAllByText('20.0%')).toHaveLength(2);
   });
 
   it('hides implied volatilities when disabled', () => {
@@ -259,10 +260,11 @@ describe('OptionChainDisplay', () => {
     expect(container.querySelector('.bg-slate-900\\/20')).toBeInTheDocument(); // OTM
   });
 
-  it('shows total contract count', () => {
+  it('shows the strike count, and the contract-count footer only for long chains', () => {
     render(<OptionChainDisplay data={mockOptionChainData} />);
-    
-    expect(screen.getByText('Showing 3 option contracts')).toBeInTheDocument();
+
+    expect(screen.getByText(/^3 strikes/)).toBeInTheDocument();
+    expect(screen.queryByText(/Showing \d+ option contracts/)).not.toBeInTheDocument();
   });
 
   it('handles large datasets with footer message', () => {
