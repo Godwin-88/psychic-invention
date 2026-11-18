@@ -164,6 +164,11 @@ if ASSET_UNIVERSE_AVAILABLE:
 if AGENTS_AVAILABLE:
     app.include_router(agents_router)
 
+# Prometheus metrics (GET /metrics)
+from .observability import install as install_metrics  # noqa: E402
+
+install_metrics(app)
+
 # Add Redis health check endpoint if available
 if REDIS_AVAILABLE:
     @app.get("/cache/health")

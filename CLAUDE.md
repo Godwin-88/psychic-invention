@@ -266,6 +266,7 @@ VITE_ENABLE_DEMO=true
 ## Deployment
 
 - **Docker** → `docker build -t pricing-engine .` (multi-stage: Rust builder → slim non-root runtime, `HEALTHCHECK`, gunicorn). Set `APP_ENV=production`, `WRITE_API_KEYS`, `ADMIN_API_KEYS`, `CORS_ORIGINS`; set `DATABASE_URL` before `WEB_CONCURRENCY` > 1.
+- **Metrics** → `GET /metrics` (Prometheus: request count and latency by route).
 - **CI** → `.github/workflows/ci.yml`: Rust tests + clippy, wheel build + pytest (3.10, 3.12), pip-audit, frontend type-check/test/build, Docker build + smoke test.
 
 - **Backend** → Render.com (`render.yaml`). Build: `build.sh` (Rust toolchain → wheel → install). Start: gunicorn + uvicorn (1 worker until `DATABASE_URL` is set).
