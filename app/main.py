@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from contextlib import asynccontextmanager
@@ -15,6 +15,7 @@ from .error_handling import (
     NumericalInstabilityError, configure_logging, error_handler
 )
 from .health_check import get_health_report, get_basic_health, health_checker
+from .security import cors_origins, require_admin
 
 # Try to import the Rust pricing engine, fall back to mock if not available
 try:
@@ -138,7 +139,7 @@ async def add_request_id(request: Request, call_next):
 
 # CORS — added AFTER the @app.middleware decorator so it's inserted last
 # and therefore becomes the TRUE outermost middleware after stack reversal.
-_ALLOWED_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
+_ALLOWED_ORIGINS = cors_origins()  # CORS_ORIGINS env, explicit origins only
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_ALLOWED_ORIGINS,
@@ -202,7 +203,7 @@ if REDIS_AVAILABLE:
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
     
-    @app.post("/cache/clear")
+    @app.post("/cache/clear", dependencies=[Depends(require_admin)])
     async def clear_all_cache():
         """Clear all cached data (L1 + L2)"""
         try:

@@ -226,6 +226,13 @@ DERIV_APP_ID=your_app_id
 
 MAX_CONCURRENT_REQUESTS=1000
 RATE_LIMIT_PER_SECOND=10
+
+# Runtime & security (see app/security.py)
+APP_ENV=development        # production: fail closed (no mock engine, keys required)
+WRITE_API_KEYS=            # comma-separated; POST /blotter/trade
+ADMIN_API_KEYS=            # cache flush, /agents/enrich, marketplace registrations
+CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+DATABASE_URL=              # Postgres blotter; required with >1 worker
 ```
 
 ### Frontend (`frontend/.env`)
@@ -233,6 +240,7 @@ RATE_LIMIT_PER_SECOND=10
 VITE_API_URL=http://localhost:8000
 VITE_ENV=development
 VITE_ENABLE_DEMO=true
+# VITE_API_KEY=            # sent as X-API-Key; trusted internal deployments only
 ```
 
 ---
@@ -242,7 +250,7 @@ VITE_ENABLE_DEMO=true
 1. **Import error for `pricing_engine`** — Rust library not built. Run `maturin develop` first.
 2. **cvxpy not installed** → MVO/Kelly endpoints return 503. `pip install cvxpy`.
 3. **Port 8000 in use** → Kill existing process: `lsof -ti:8000 | xargs kill -9`.
-4. **CORS errors in browser** — Backend CORS is set to `localhost:3000`. Frontend must run on port 3000.
+4. **CORS errors in browser** — Allowed origins come from `CORS_ORIGINS` (default `localhost:3000`). Add your frontend origin there.
 5. **Feller condition violated** → Heston endpoints return 400 if `2κθ ≤ σᵥ²`. Adjust parameters.
 6. **Redis connection refused** → Docker not running. Run `docker compose up -d redis` or use `--no-redis` flag.
 7. **`redis.asyncio` AttributeError** → `redis` package too old. `pip install "redis>=5.0"`.

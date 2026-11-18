@@ -13,11 +13,17 @@ import type {
   SupportedSymbolsResponse
 } from '@/types';
 
+// Optional API key for write-scoped endpoints (e.g. booking trades). Only set
+// VITE_API_KEY for trusted, internal deployments: anything in a Vite env var is
+// shipped to the browser.
+const API_KEY: string | undefined = import.meta.env.VITE_API_KEY;
+
 const apiClient = axios.create({
   baseURL: API_CONFIG.BASE_URL,
   timeout: API_CONFIG.TIMEOUT,
   headers: {
     'Content-Type': 'application/json',
+    ...(API_KEY ? { 'X-API-Key': API_KEY } : {}),
   },
 });
 

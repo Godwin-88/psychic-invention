@@ -2,8 +2,9 @@
 Transact Phase 1 Routes — Portfolio, Risk, Optimizer, Blotter
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+from .security import require_admin, require_write
 from typing import Optional, List
 import numpy as np
 
@@ -79,7 +80,7 @@ def marketplace_register(req: MarketplaceRegistrationRequest):
     return {"status": "ok", "message": f"Registration received for {req.menu_id}.", "count": len(_registrations)}
 
 
-@router.get("/marketplace/registrations")
+@router.get("/marketplace/registrations", dependencies=[Depends(require_admin)])
 def marketplace_registrations():
     """Return all registrations (admin view)."""
     return {"registrations": _registrations, "count": len(_registrations)}
@@ -985,7 +986,7 @@ class PositionsRequest(BaseModel):
     current_prices: dict  # {"AAPL": 150.0, ...}
 
 
-@router.post("/blotter/trade")
+@router.post("/blotter/trade", dependencies=[Depends(require_write)])
 def post_blotter_trade(req: TradeEntryRequest):
     """Add a new trade. Persists to Postgres + double-entry ledger when DATABASE_URL is set."""
     try:

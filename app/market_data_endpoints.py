@@ -12,6 +12,8 @@ L3  Redis (long-TTL)      1 hr    historical / yfinance / OpenBB data
 """
 
 from fastapi import APIRouter, HTTPException, Depends
+
+from .security import require_admin
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime, date
@@ -322,7 +324,7 @@ async def get_cache_stats(client: DerivAPIClient = Depends(get_deriv_client)):
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.post("/cache/clear")
+@router.post("/cache/clear", dependencies=[Depends(require_admin)])
 async def clear_cache(client: DerivAPIClient = Depends(get_deriv_client)):
     """
     Clear all cached market data.
