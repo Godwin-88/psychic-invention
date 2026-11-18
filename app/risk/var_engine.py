@@ -20,9 +20,16 @@ class VaRResult:
     scaled: bool
 
 
-def _scale_var(var_1d: float, horizon_days: int) -> float:
-    """Square root of time: VaR(T) = VaR(1) × √T."""
-    return var_1d * np.sqrt(horizon_days)
+def _scale_var(var_1d: float, horizon_days: int, mean_loss_1d: float = 0.0) -> float:
+    """Scale a 1-day risk figure to `horizon_days` under i.i.d. returns.
+
+    The volatility part grows with √T and the mean with T:
+        VaR(T) = √T·(VaR(1) − μ_L) + T·μ_L,  μ_L = mean 1-day loss.
+    Exact for normal returns; the standard approximation otherwise. With
+    μ_L = 0 it reduces to the √T rule.
+    """
+    t = float(horizon_days)
+    return float(np.sqrt(t) * (var_1d - mean_loss_1d) + t * mean_loss_1d)
 
 
 def var_historical(
@@ -51,9 +58,10 @@ def var_historical(
     tail = losses[losses >= q_alpha]
     es_1d = float(np.mean(tail)) if len(tail) > 0 else var_1d
 
+    mean_loss = float(-np.mean(portfolio_returns) * portfolio_value)
     if horizon_days > 1:
-        var_val = _scale_var(var_1d, horizon_days)
-        es_val = _scale_var(es_1d, horizon_days)
+        var_val = _scale_var(var_1d, horizon_days, mean_loss)
+        es_val = _scale_var(es_1d, horizon_days, mean_loss)
         scaled = True
     else:
         var_val = var_1d
@@ -97,9 +105,10 @@ def var_parametric_normal(
     phi_inv = stats.norm.ppf(alpha)
     es_1d = portfolio_value * (-mu + sigma * stats.norm.pdf(phi_inv) / alpha)
 
+    mean_loss = float(-np.mean(portfolio_returns) * portfolio_value)
     if horizon_days > 1:
-        var_val = _scale_var(var_1d, horizon_days)
-        es_val = _scale_var(es_1d, horizon_days)
+        var_val = _scale_var(var_1d, horizon_days, mean_loss)
+        es_val = _scale_var(es_1d, horizon_days, mean_loss)
         scaled = True
     else:
         var_val = var_1d
@@ -144,9 +153,10 @@ def var_parametric_t(
     es_factor = (nu + t_inv ** 2) / (nu - 1)
     es_1d = portfolio_value * (-mu + sigma * t_pdf / alpha * es_factor)
 
+    mean_loss = float(-np.mean(portfolio_returns) * portfolio_value)
     if horizon_days > 1:
-        var_val = _scale_var(var_1d, horizon_days)
-        es_val = _scale_var(es_1d, horizon_days)
+        var_val = _scale_var(var_1d, horizon_days, mean_loss)
+        es_val = _scale_var(es_1d, horizon_days, mean_loss)
         scaled = True
     else:
         var_val = var_1d
@@ -203,9 +213,10 @@ def var_monte_carlo(
     tail = losses[losses >= var_1d]
     es_1d = float(np.mean(tail)) if len(tail) > 0 else var_1d
 
+    mean_loss = float(-np.mean(portfolio_returns) * portfolio_value)
     if horizon_days > 1:
-        var_val = _scale_var(var_1d, horizon_days)
-        es_val = _scale_var(es_1d, horizon_days)
+        var_val = _scale_var(var_1d, horizon_days, mean_loss)
+        es_val = _scale_var(es_1d, horizon_days, mean_loss)
         scaled = True
     else:
         var_val = var_1d

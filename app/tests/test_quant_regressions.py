@@ -209,3 +209,52 @@ def test_reference_engine_matches_rust():
     for fn, args, tol in cases:
         assert getattr(ref, fn)(*args) == pytest.approx(getattr(pricing_engine, fn)(*args), abs=tol), fn
     assert ref.price_american(36, 40, 1.0, 0.06, 0.2)[0] == pytest.approx(4.4867, abs=1e-3)
+
+
+# ── Implied vol, Heston calibration, VaR horizon ─────────────────────────────
+
+from app.vol.calibration import ImpliedVolError, heston_calibrate, implied_vol_bs  # noqa: E402
+
+
+@pytest.mark.parametrize("k", [50.0, 80.0, 100.0, 130.0, 200.0])
+@pytest.mark.parametrize("kind", ["call", "put"])
+def test_implied_vol_round_trips_including_deep_itm_otm(k, kind):
+    s, t, r, q, sig = 100.0, 0.5, 0.03, 0.01, 0.35
+    price = (pricing_engine.price_call if kind == "call" else pricing_engine.price_put)(s, k, t, r, sig, q)
+    if price < 1e-8:
+        pytest.skip("price below numerical resolution")
+    assert implied_vol_bs(price, s, k, r, t, kind, q) == pytest.approx(sig, abs=1e-6)
+
+
+def test_implied_vol_rejects_arbitrage_violations():
+    with pytest.raises(ImpliedVolError):
+        implied_vol_bs(150.0, 100, 100, 0.05, 1.0)  # call above spot
+    with pytest.raises(ImpliedVolError):
+        implied_vol_bs(1.0, 100, 80, 0.05, 1.0)  # call below intrinsic
+
+
+def test_heston_calibration_recovers_parameters_including_feller_violation():
+    true = dict(v0=0.05, kappa=1.5, theta=0.05, xi=0.6, rho=-0.6)  # 2κθ=0.15 < ξ²=0.36
+    s, r = 100.0, 0.02
+    strikes, expiries = [], []
+    for t in (0.25, 0.5, 1.0, 2.0):
+        for k in (80, 90, 100, 110, 120):
+            strikes.append(float(k))
+            expiries.append(t)
+    prices = pricing_engine.price_heston_calls_batch(
+        s, strikes, expiries, true["v0"], r, true["kappa"], true["theta"], true["xi"], true["rho"], 0.0, False
+    )
+    res = heston_calibrate(s, r, np.array(strikes), np.array(expiries), np.array(prices))
+    assert res.iv_rmse is not None and res.iv_rmse < 0.05  # vol points
+    assert not res.feller_ok
+    assert res.v0 == pytest.approx(true["v0"], rel=0.05)
+    assert res.rho == pytest.approx(true["rho"], abs=0.05)
+
+
+def test_var_horizon_scaling_treats_mean_linearly():
+    rng = np.random.default_rng(5)
+    mu, sig = 0.002, 0.01
+    r = rng.normal(mu, sig, size=(50_000, 1))
+    res = var_parametric_normal(r, alpha=0.01, horizon_days=10)
+    exact = -(mu * 10) + sig * math.sqrt(10) * norm.ppf(0.99)
+    assert res.var == pytest.approx(exact, rel=0.03)

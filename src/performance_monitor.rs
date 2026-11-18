@@ -200,7 +200,7 @@ impl TimedPricingEngine {
         s: f64, k: f64, v0: f64, r: f64, kappa: f64, theta: f64, sigma_v: f64, rho: f64, tau: f64
     ) -> PyResult<f64> {
         let start = Instant::now();
-        let result = crate::heston::price_heston_call(s, k, v0, r, kappa, theta, sigma_v, rho, tau, 0.0);
+        let result = crate::heston::price_heston_call(s, k, v0, r, kappa, theta, sigma_v, rho, tau, 0.0, true);
         let duration = start.elapsed();
         GLOBAL_MONITOR.record_operation("heston_call", duration);
         result

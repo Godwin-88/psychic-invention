@@ -160,7 +160,7 @@ fn benchmark_heston_pricing(c: &mut Criterion) {
                 black_box(THETA),
                 black_box(SIGMA_V),
                 black_box(RHO),
-                black_box(TAU), 0.0))
+                black_box(TAU), 0.0, true))
         })
     });
     
@@ -175,7 +175,7 @@ fn benchmark_heston_pricing(c: &mut Criterion) {
                 black_box(THETA),
                 black_box(SIGMA_V),
                 black_box(RHO),
-                black_box(TAU), 0.0))
+                black_box(TAU), 0.0, true))
         })
     });
     
@@ -193,7 +193,7 @@ fn benchmark_heston_pricing(c: &mut Criterion) {
                     black_box(THETA),
                     black_box(SIGMA_V),
                     black_box(RHO),
-                    black_box(TAU), 0.0));
+                    black_box(TAU), 0.0, true));
             }
         })
     });
@@ -306,7 +306,7 @@ fn benchmark_mixed_workload(c: &mut Criterion) {
                 }
                 // 10% Heston pricing (more expensive)
                 else {
-                    black_box(price_heston_call(S, strike, V0, R, KAPPA, THETA, SIGMA_V, RHO, TAU, 0.0));
+                    black_box(price_heston_call(S, strike, V0, R, KAPPA, THETA, SIGMA_V, RHO, TAU, 0.0, true));
                 }
             }
         })
@@ -383,7 +383,7 @@ fn benchmark_parameter_variations(c: &mut Criterion) {
                         black_box(THETA),
                         black_box(SIGMA_V),
                         black_box(RHO),
-                        black_box(TAU), 0.0))
+                        black_box(TAU), 0.0, true))
                 })
             }
         );

@@ -32,11 +32,17 @@ pub fn validate_feller_condition(kappa: f64, theta: f64, xi: f64) -> Result<(), 
     }
 }
 
-/// Validate all Heston parameters are reasonable
-pub fn validate_heston_parameters(v0: f64, kappa: f64, theta: f64, xi: f64, rho: f64) -> Result<(), HestonError> {
-    if v0 <= 0.0 || kappa <= 0.0 || theta <= 0.0 || xi <= 0.0 || rho < -1.0 || rho > 1.0 {
+/// Validate the Heston parameter domain (positivity, |ρ| ≤ 1).
+pub fn validate_heston_domain(v0: f64, kappa: f64, theta: f64, xi: f64, rho: f64) -> Result<(), HestonError> {
+    if v0 <= 0.0 || kappa <= 0.0 || theta <= 0.0 || xi <= 0.0 || !(-1.0..=1.0).contains(&rho) {
         return Err(HestonError::InvalidParameters);
     }
+    Ok(())
+}
+
+/// Validate all Heston parameters, including the Feller condition.
+pub fn validate_heston_parameters(v0: f64, kappa: f64, theta: f64, xi: f64, rho: f64) -> Result<(), HestonError> {
+    validate_heston_domain(v0, kappa, theta, xi, rho)?;
     validate_feller_condition(kappa, theta, xi)
 }
 
@@ -166,7 +172,32 @@ fn price_heston_call_impl(
     tau: f64,
     q: f64,
 ) -> Result<f64, HestonError> {
-    validate_heston_parameters(v0, kappa, theta, xi, rho)?;
+    price_heston_call_checked(s, k, v0, r, kappa, theta, xi, rho, tau, q, true)
+}
+
+/// Heston call with optional Feller enforcement. The pricing formula is valid
+/// whether or not 2κθ > ξ² holds (the condition only keeps variance strictly
+/// positive); calibrations to market smiles frequently violate it, so the
+/// calibrator prices with `enforce_feller = false`.
+#[allow(clippy::too_many_arguments)]
+pub fn price_heston_call_checked(
+    s: f64,
+    k: f64,
+    v0: f64,
+    r: f64,
+    kappa: f64,
+    theta: f64,
+    xi: f64,
+    rho: f64,
+    tau: f64,
+    q: f64,
+    enforce_feller: bool,
+) -> Result<f64, HestonError> {
+    if enforce_feller {
+        validate_heston_parameters(v0, kappa, theta, xi, rho)?;
+    } else {
+        validate_heston_domain(v0, kappa, theta, xi, rho)?;
+    }
     if s <= 0.0 || k <= 0.0 {
         return Err(HestonError::InvalidParameters);
     }
@@ -217,7 +248,7 @@ fn price_heston_call_impl(
 
 /// Heston call pricing via numeric integration
 #[pyfunction]
-#[pyo3(signature = (s, k, v0, r, kappa, theta, xi, rho, tau, q=0.0))]
+#[pyo3(signature = (s, k, v0, r, kappa, theta, xi, rho, tau, q=0.0, enforce_feller=true))]
 #[allow(clippy::too_many_arguments)]
 pub fn price_heston_call(
     s: f64,
@@ -230,11 +261,47 @@ pub fn price_heston_call(
     rho: f64,
     tau: f64,
     q: f64,
+    enforce_feller: bool,
 ) -> PyResult<f64> {
-    match price_heston_call_impl(s, k, v0, r, kappa, theta, xi, rho, tau, q) {
+    match price_heston_call_checked(s, k, v0, r, kappa, theta, xi, rho, tau, q, enforce_feller) {
         Ok(price) => Ok(price),
         Err(e) => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string())),
     }
+}
+
+/// Price many Heston calls (one per (strike, expiry) pair) in parallel with the
+/// GIL released. Used by calibration, where it is the hot loop.
+#[pyfunction]
+#[pyo3(signature = (s, strikes, expiries, v0, r, kappa, theta, xi, rho, q=0.0, enforce_feller=true))]
+#[allow(clippy::too_many_arguments)]
+pub fn price_heston_calls_batch(
+    py: Python<'_>,
+    s: f64,
+    strikes: Vec<f64>,
+    expiries: Vec<f64>,
+    v0: f64,
+    r: f64,
+    kappa: f64,
+    theta: f64,
+    xi: f64,
+    rho: f64,
+    q: f64,
+    enforce_feller: bool,
+) -> PyResult<Vec<f64>> {
+    use rayon::prelude::*;
+    if strikes.len() != expiries.len() {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "strikes and expiries must have the same length",
+        ));
+    }
+    let out: Result<Vec<f64>, HestonError> = py.allow_threads(|| {
+        strikes
+            .par_iter()
+            .zip(expiries.par_iter())
+            .map(|(&k, &tau)| price_heston_call_checked(s, k, v0, r, kappa, theta, xi, rho, tau, q, enforce_feller))
+            .collect()
+    });
+    out.map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
 }
 
 /// Validate Feller condition from Python
@@ -245,7 +312,7 @@ pub fn validate_feller_condition_py(kappa: f64, theta: f64, xi: f64) -> PyResult
 
 /// Heston put via put–call parity.
 #[pyfunction]
-#[pyo3(signature = (s, k, v0, r, kappa, theta, xi, rho, tau, q=0.0))]
+#[pyo3(signature = (s, k, v0, r, kappa, theta, xi, rho, tau, q=0.0, enforce_feller=true))]
 #[allow(clippy::too_many_arguments)]
 pub fn price_heston_put(
     s: f64,
@@ -258,8 +325,9 @@ pub fn price_heston_put(
     rho: f64,
     tau: f64,
     q: f64,
+    enforce_feller: bool,
 ) -> PyResult<f64> {
-    let c = price_heston_call(s, k, v0, r, kappa, theta, xi, rho, tau, q)?;
+    let c = price_heston_call(s, k, v0, r, kappa, theta, xi, rho, tau, q, enforce_feller)?;
     // Put–call parity with dividends: P = C − S e^{−qτ} + K e^{−rτ}
     let p = c - s * (-q * tau).exp() + k * (-r * tau).exp();
     Ok(p.max(0.0))

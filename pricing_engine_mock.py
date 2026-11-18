@@ -214,10 +214,10 @@ def _simpson(f, a, b, n=4000):
     return tot * h / 3
 
 
-def price_heston_call(s, k, v0, r, kappa, theta, xi, rho, tau, q=0.0):
+def price_heston_call(s, k, v0, r, kappa, theta, xi, rho, tau, q=0.0, enforce_feller=True):
     if v0 <= 0 or kappa <= 0 or theta <= 0 or xi <= 0 or not -1 <= rho <= 1:
         raise ValueError("Invalid Heston parameters")
-    if not validate_feller_condition_py(kappa, theta, xi):
+    if enforce_feller and not validate_feller_condition_py(kappa, theta, xi):
         raise ValueError("Feller condition violated: 2*kappa*theta <= xi^2")
     if tau <= 0:
         return max(s - k, 0.0)
@@ -239,9 +239,18 @@ def price_heston_call(s, k, v0, r, kappa, theta, xi, rho, tau, q=0.0):
     return min(max(c, max(spot_pv - k * math.exp(-r * tau), 0.0)), spot_pv)
 
 
-def price_heston_put(s, k, v0, r, kappa, theta, xi, rho, tau, q=0.0):
-    c = price_heston_call(s, k, v0, r, kappa, theta, xi, rho, tau, q)
+def price_heston_put(s, k, v0, r, kappa, theta, xi, rho, tau, q=0.0, enforce_feller=True):
+    c = price_heston_call(s, k, v0, r, kappa, theta, xi, rho, tau, q, enforce_feller)
     return max(c - s * math.exp(-q * tau) + k * math.exp(-r * tau), 0.0)
+
+
+def price_heston_calls_batch(s, strikes, expiries, v0, r, kappa, theta, xi, rho, q=0.0, enforce_feller=True):
+    if len(strikes) != len(expiries):
+        raise ValueError("strikes and expiries must have the same length")
+    return [
+        price_heston_call(s, k, v0, r, kappa, theta, xi, rho, t, q, enforce_feller)
+        for k, t in zip(strikes, expiries)
+    ]
 
 
 def _heston_greeks(s, k, tau, r, v0, theta, kappa, sigma_v, rho, q, put):

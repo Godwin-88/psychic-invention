@@ -338,7 +338,7 @@ pub fn calculate_heston_call_greeks(
     // Vega is taken with respect to the instantaneous volatility √v0:
     // the bumped σ maps back to v0 = σ².
     let price_fn = |s: f64, k: f64, tau: f64, r: f64, sigma: f64| -> Result<f64, PyErr> {
-        price_heston_call(s, k, sigma * sigma, r, kappa, theta, sigma_v, rho, tau, q)
+        price_heston_call(s, k, sigma * sigma, r, kappa, theta, sigma_v, rho, tau, q, true)
     };
     GreeksCalculator::calculate_numerical_greeks(s, k, tau, r, v0.sqrt(), price_fn)
 }
@@ -353,7 +353,7 @@ pub fn calculate_heston_put_greeks(
     // Vega is taken with respect to the instantaneous volatility √v0:
     // the bumped σ maps back to v0 = σ².
     let price_fn = |s: f64, k: f64, tau: f64, r: f64, sigma: f64| -> Result<f64, PyErr> {
-        price_heston_put(s, k, sigma * sigma, r, kappa, theta, sigma_v, rho, tau, q)
+        price_heston_put(s, k, sigma * sigma, r, kappa, theta, sigma_v, rho, tau, q, true)
     };
     GreeksCalculator::calculate_numerical_greeks(s, k, tau, r, v0.sqrt(), price_fn)
 }

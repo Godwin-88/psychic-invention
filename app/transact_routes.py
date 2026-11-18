@@ -32,7 +32,7 @@ from .factors.fama_macbeth import fama_macbeth
 from .factors.smart_beta import smart_beta_sort, smart_beta_signal_weighted
 from .factors.crowding import crowding_index
 from .higher_moments import compute_coskewness
-from .vol.calibration import heston_calibrate, implied_vol_bs
+from .vol.calibration import ImpliedVolError, heston_calibrate, implied_vol_bs
 from .risk.covariance import compute_covariance_health, compute_mst
 
 try:
@@ -564,7 +564,9 @@ class HestonCalibrateRequest(BaseModel):
     r: float
     strikes: List[float]
     expiries: List[float]
-    market_prices: List[float]
+    market_prices: List[float]  # European call prices
+    q: float = 0.0
+    enforce_feller: bool = False
 
 
 class SmartBetaRequest(BaseModel):
@@ -669,15 +671,22 @@ def post_heston_calibrate(req: HestonCalibrateRequest):
         res = heston_calibrate(
             req.s, req.r,
             np.array(req.strikes), np.array(req.expiries), np.array(req.market_prices),
+            q=req.q, enforce_feller=req.enforce_feller,
         )
         return {
+            "model": "heston_calibration",
             "v0": float(res.v0),
             "kappa": float(res.kappa),
             "theta": float(res.theta),
             "xi": float(res.xi),
             "rho": float(res.rho),
             "rmse": float(res.rmse),
+            "iv_rmse_vol_points": res.iv_rmse,
             "feller_condition_ok": bool(res.feller_ok),
+            "converged": res.success,
+            "message": res.message,
+            "n_options": res.n_options,
+            "residuals": res.residuals,
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -689,17 +698,25 @@ class ImpliedSurfaceRequest(BaseModel):
     strikes: List[float]
     expiries: List[float]
     market_prices: List[float]
+    q: float = 0.0
+    option_type: str = "call"
 
 
 @router.post("/vol/implied-surface")
 def post_vol_implied_surface(req: ImpliedSurfaceRequest):
     """Compute IV for each (K,tau) from market prices (calls)."""
     try:
+        if not len(req.strikes) == len(req.expiries) == len(req.market_prices):
+            raise ValueError("strikes, expiries and market_prices must have equal length")
         ivs = []
-        for i in range(len(req.strikes)):
-            iv = implied_vol_bs(req.market_prices[i], req.s, req.strikes[i], req.r, req.expiries[i], "call")
-            ivs.append({"strike": float(req.strikes[i]), "expiry": float(req.expiries[i]), "iv": float(iv)})
-        return {"surface": ivs}
+        for k, t, p in zip(req.strikes, req.expiries, req.market_prices):
+            point = {"strike": float(k), "expiry": float(t), "iv": None, "error": None}
+            try:
+                point["iv"] = implied_vol_bs(p, req.s, k, req.r, t, req.option_type, req.q)
+            except ImpliedVolError as e:
+                point["error"] = str(e)
+            ivs.append(point)
+        return {"model": "black_scholes_implied_vol", "surface": ivs}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -727,17 +744,15 @@ def post_vol_heston_surface(req: HestonSurfaceRequest):
             row = []
             for m in moneyness:
                 k = m * req.s
-                price = 0.0
-                if HAS_PRICING:
-                    try:
-                        price = float(pricing_engine.price_heston_call(
-                            req.s, k, req.v0, req.r,
-                            req.kappa, req.theta, req.xi, req.rho, tau
-                        ))
-                    except Exception:
-                        price = 0.0
-                iv = implied_vol_bs(price, req.s, k, req.r, tau, "call") if price > 1e-6 else float(np.sqrt(req.v0))
-                row.append(round(iv, 5))
+                # Feller is not required for pricing; it is reported below.
+                price = float(pricing_engine.price_heston_call(
+                    req.s, k, req.v0, req.r,
+                    req.kappa, req.theta, req.xi, req.rho, float(tau), 0.0, False,
+                ))
+                try:
+                    row.append(round(implied_vol_bs(price, req.s, k, req.r, float(tau), "call"), 5))
+                except ImpliedVolError:
+                    row.append(None)  # price at intrinsic: IV not identifiable
             iv_grid.append(row)
         # smile at mid expiry
         mid = req.n_expiry // 2

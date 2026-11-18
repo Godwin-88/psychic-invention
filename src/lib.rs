@@ -51,6 +51,7 @@ pub fn pricing_engine(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(heston::cf_heston, m)?)?;
     m.add_function(wrap_pyfunction!(heston::price_heston_call, m)?)?;
     m.add_function(wrap_pyfunction!(heston::price_heston_put, m)?)?;
+    m.add_function(wrap_pyfunction!(heston::price_heston_calls_batch, m)?)?;
     m.add_function(wrap_pyfunction!(heston::validate_feller_condition_py, m)?)?;
     
     // Phase 5 - Greeks Calculator (Optimized)

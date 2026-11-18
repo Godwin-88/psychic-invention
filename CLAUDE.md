@@ -192,7 +192,7 @@ L3  Redis long-TTL      (1 hr,  OHLCV history, news)
 | `app/factors/fama_macbeth.py` | Fama-MacBeth two-stage regression |
 | `app/factors/smart_beta.py` | Quintile & signal-weighted smart beta |
 | `app/factors/crowding.py` | Factor crowding / herding index |
-| `app/vol/calibration.py` | Heston calibration & implied vol (BS Newton) |
+| `app/vol/calibration.py` | Heston calibration (vega-weighted least squares) & implied vol (Brent) |
 | `app/higher_moments.py` | Coskewness matrix |
 | `app/deriv_api_client.py` | Deriv API WebSocket client + L1/L2 cache |
 | `app/market_data_endpoints.py` | Market data FastAPI router |
