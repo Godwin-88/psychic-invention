@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime, date
 import asyncio
+import os
 import logging
 import json
 
@@ -33,25 +34,37 @@ logger = logging.getLogger(__name__)
 # Create router for market data endpoints
 router = APIRouter(prefix="/market-data", tags=["market-data"])
 
-# Global client instance (in production, this should be managed properly)
+# One client per event loop: an httpx client's pooled connections belong to the
+# loop that opened them, so a client must not be reused after that loop closes
+# (tests, worker restarts). In a normal uvicorn worker there is a single loop.
 _deriv_client: Optional[DerivAPIClient] = None
+_deriv_client_loop: Optional[asyncio.AbstractEventLoop] = None
 
 
 async def get_deriv_client() -> DerivAPIClient:
-    """Dependency to get or create Deriv API client"""
-    global _deriv_client
-    
+    """Dependency: the Deriv API client for the running event loop.
+
+    Credentials come from DERIV_API_KEY / DERIV_APP_ID (previously hard-coded
+    placeholders were sent).
+    """
+    global _deriv_client, _deriv_client_loop
+    loop = asyncio.get_running_loop()
+    if _deriv_client is not None and _deriv_client_loop is not loop:
+        # Created on another (possibly closed) loop: drop it without awaiting
+        # its close(), which would run on the wrong loop.
+        _deriv_client = None
     if _deriv_client is None:
-        # In production, these should come from environment variables
+        if os.getenv("APP_ENV", "").lower() in ("production", "prod") and not os.getenv("DERIV_API_KEY"):
+            logger.warning("DERIV_API_KEY is not set; Deriv market data requests will fail")
         _deriv_client = DerivAPIClient(
-            api_key="production_api_key",  # Replace with actual API key
-            app_id="production_app_id",    # Replace with actual app ID
-            base_url="https://api.deriv.com",
-            cache_ttl_l1=30,  # 30 second L1 cache
-            cache_ttl_l2=300, # 5 minute L2 cache
-            rate_limit=10.0   # 10 requests per second
+            api_key=os.getenv("DERIV_API_KEY", ""),
+            app_id=os.getenv("DERIV_APP_ID", ""),
+            base_url=os.getenv("DERIV_BASE_URL", "https://api.deriv.com"),
+            cache_ttl_l1=int(os.getenv("CACHE_TTL_L1", "30")),
+            cache_ttl_l2=int(os.getenv("CACHE_TTL_L2", "300")),
+            rate_limit=float(os.getenv("RATE_LIMIT_PER_SECOND", "10")),
         )
-    
+        _deriv_client_loop = loop
     return _deriv_client
 
 
@@ -368,9 +381,11 @@ async def get_supported_symbols():
 # Cleanup function for application shutdown
 async def cleanup_deriv_client():
     """Clean up Deriv API client on application shutdown"""
-    global _deriv_client
-    
+    global _deriv_client, _deriv_client_loop
+
     if _deriv_client is not None:
-        await _deriv_client.close()
+        if _deriv_client_loop is asyncio.get_running_loop():
+            await _deriv_client.close()
+            logger.info("Deriv API client closed")
         _deriv_client = None
-        logger.info("Deriv API client closed")
+        _deriv_client_loop = None
