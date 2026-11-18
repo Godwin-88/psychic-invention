@@ -160,3 +160,30 @@ def get_positions_from_db(current_prices: Dict[str, float]) -> List[Dict[str, An
     trades = list(reversed(get_trades_from_db()))
     trades.sort(key=lambda t: t["entry_date"])
     return [v.to_dict() for v in position_views(build_books(trades), current_prices)]
+
+
+def load_store():
+    """Read-only TradeStore snapshot of the Postgres trades, so every blotter
+    view (positions, P&L series, agent context) uses the same FIFO engine."""
+    from .trade_store import Trade, TradeStore
+
+    store = TradeStore()
+    rows = list(reversed(get_trades_from_db()))  # oldest first
+    rows.sort(key=lambda t: t["entry_date"])
+    for seq, t in enumerate(rows, 1):
+        store._trades.append(
+            Trade(
+                id=str(t["id"]),
+                asset=t["asset"],
+                direction=t["direction"],
+                quantity=float(t["quantity"]),
+                entry_price=float(t["entry_price"]),
+                entry_date=t["entry_date"],
+                model_used=t.get("model_used"),
+                theoretical_price_at_entry=t.get("theoretical_price_at_entry"),
+                strategy_tag=t.get("strategy_tag"),
+                seq=seq,
+            )
+        )
+    store._seq = len(rows)
+    return store

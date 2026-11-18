@@ -7,3 +7,4 @@ statsmodels>=0.14
 arch>=6                    # GARCH
 scikit-learn>=1.3
 # nautilus_trader>=1.220   # Blotter live data / execution (optional)
+mcp>=2,<3                  # MCP server for the trading agent tools (app/trading/mcp_server.py)

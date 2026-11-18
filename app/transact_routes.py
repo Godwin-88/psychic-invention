@@ -24,7 +24,24 @@ from .blotter.db_blotter import (
     add_trade as db_add_trade,
     get_trades_from_db,
     get_positions_from_db,
+    load_store as db_load_store,
 )
+from .security import is_production
+
+
+def require_persistent_blotter() -> None:
+    """In production the blotter must be the Postgres ledger: the in-memory
+    store is per process, so with several workers each sees a different book."""
+    if is_production() and not use_db_blotter():
+        raise HTTPException(
+            status_code=503,
+            detail="Blotter requires DATABASE_URL (PostgreSQL) in production",
+        )
+
+
+def blotter_store():
+    """Postgres-backed snapshot when configured, else the in-memory store (dev)."""
+    return db_load_store() if use_db_blotter() else get_trade_store()
 from .scenarios.scenario_engine import apply_custom_scenario, probabilistic_scenario_optimization, CRISIS_PERIODS
 from .scenarios.monte_carlo import monte_carlo_portfolio
 from .scenarios.behavioral import portfolio_perceived_utility, herding_stress_var
@@ -986,7 +1003,7 @@ class PositionsRequest(BaseModel):
     current_prices: dict  # {"AAPL": 150.0, ...}
 
 
-@router.post("/blotter/trade", dependencies=[Depends(require_write)])
+@router.post("/blotter/trade", dependencies=[Depends(require_write), Depends(require_persistent_blotter)])
 def post_blotter_trade(req: TradeEntryRequest):
     """Add a new trade. Persists to Postgres + double-entry ledger when DATABASE_URL is set."""
     try:
@@ -1036,7 +1053,7 @@ def post_blotter_trade(req: TradeEntryRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/blotter/positions")
+@router.get("/blotter/positions", dependencies=[Depends(require_persistent_blotter)])
 def get_blotter_positions(current_prices: Optional[str] = None):
     """Get open positions with P&L. Uses DB when DATABASE_URL is set."""
     try:
@@ -1053,7 +1070,7 @@ def get_blotter_positions(current_prices: Optional[str] = None):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/blotter/positions")
+@router.post("/blotter/positions", dependencies=[Depends(require_persistent_blotter)])
 def post_blotter_positions(req: PositionsRequest):
     """Get positions with P&L given current prices. Uses DB when DATABASE_URL is set."""
     try:
@@ -1091,7 +1108,7 @@ def get_blotter_accounts(as_of_date: Optional[str] = None):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/blotter/history")
+@router.get("/blotter/history", dependencies=[Depends(require_persistent_blotter)])
 def get_blotter_history(
     asset: Optional[str] = None,
     from_date: Optional[str] = None,
@@ -1273,7 +1290,7 @@ def post_scenarios_behavioral(req: BehavioralRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/blotter/context")
+@router.get("/blotter/context", dependencies=[Depends(require_persistent_blotter)])
 def get_blotter_context():
     """
     Aggregated blotter context for the AI agent.
@@ -1281,7 +1298,7 @@ def get_blotter_context():
     and attribution metadata in a single lightweight payload.
     """
     try:
-        store = get_trade_store()
+        store = blotter_store()
         positions_raw = store.get_positions({})
         trades_raw = store.get_history() if hasattr(store, 'get_history') else []
 
@@ -1361,11 +1378,11 @@ def post_blotter_attribution(req: AttributionRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/blotter/pnl")
+@router.post("/blotter/pnl", dependencies=[Depends(require_persistent_blotter)])
 def post_blotter_pnl(req: PnLRequest):
     """Cumulative P&L time series or current snapshot (Menu 8)."""
     try:
-        store = get_trade_store()
+        store = blotter_store()
         if req.price_history:
             series = store.get_pnl_timeseries(
                 req.price_history, req.from_date, req.to_date

@@ -20,8 +20,11 @@ structlog>=23.2,<26
 python-dotenv>=1.0,<2
 psutil>=5.9,<8
 
-sqlalchemy>=2.0,<3       # Postgres blotter / double-entry ledger (DATABASE_URL)
-psycopg2-binary>=2.9,<3
+sqlalchemy>=2.0,<3       # Postgres blotter / trading ledger (DATABASE_URL)
+psycopg[binary]>=3.1,<4  # SQLAlchemy 2.1's default PostgreSQL driver
+alembic>=1.13,<2         # trading ledger migrations (migrations/)
+prometheus-client>=0.19  # GET /metrics
+anthropic>=2.0,<3        # Claude-backed trading agents (app/trading/agents)
 
 yfinance>=0.2.40         # research data only; not licensed for trading use
 neo4j>=5.14,<7           # agent knowledge base (optional at runtime)

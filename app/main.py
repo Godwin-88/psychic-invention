@@ -164,6 +164,17 @@ if ASSET_UNIVERSE_AVAILABLE:
 if AGENTS_AVAILABLE:
     app.include_router(agents_router)
 
+# Trading core: OMS, risk gateway, agent intents (/v1/trading). Requires the
+# trading ledger database; endpoints return 503 when it is not configured.
+from .trading.routes import router as trading_router  # noqa: E402
+
+app.include_router(trading_router)
+
+# Prometheus metrics (GET /metrics)
+from .observability import install as install_metrics  # noqa: E402
+
+install_metrics(app)
+
 # Add Redis health check endpoint if available
 if REDIS_AVAILABLE:
     @app.get("/cache/health")
