@@ -1,7 +1,21 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/Button';
 import { useMarketData, useOptionChain, useSupportedSymbols, useMarketDataHealth, useMarketComparison } from '@/hooks/useApi';
-import type { MarketDataRequest, OptionChainRequest, OptionRequest, MarketDataComparison } from '@/types';
+import type { OptionRequest, MarketDataComparison } from '@/types';
+
+/** Format a possibly-missing number (market data fields are often null). */
+const fmt = (v: number | null | undefined, digits = 2): string =>
+  v === null || v === undefined || !Number.isFinite(v) ? '—' : v.toFixed(digits);
+
+/** Format an arithmetic expression whose operands may be null/undefined. */
+const fmtExpr = (f: () => number | null | undefined, digits = 2): string => {
+  try {
+    return fmt(f(), digits);
+  } catch {
+    return '—';
+  }
+};
+
 
 interface MarketDataDashboardProps {
   onSymbolSelect?: (symbol: string, marketData: any) => void;
@@ -10,8 +24,7 @@ interface MarketDataDashboardProps {
 }
 
 export const MarketDataDashboard = ({ 
-  onSymbolSelect, 
-  currentPricingParams,
+  onSymbolSelect,
   theoreticalPrice 
 }: MarketDataDashboardProps) => {
   const [selectedSymbol, setSelectedSymbol] = useState<string>('AAPL');
@@ -19,7 +32,7 @@ export const MarketDataDashboard = ({
   const [autoRefresh, setAutoRefresh] = useState<boolean>(false);
   const [comparison, setComparison] = useState<MarketDataComparison | null>(null);
 
-  const { isHealthy, loading: healthLoading, error: healthError } = useMarketDataHealth();
+  const { isHealthy, loading: healthLoading } = useMarketDataHealth();
   const { data: supportedSymbols, loading: symbolsLoading } = useSupportedSymbols();
   const { 
     fetchMarketData, 
@@ -158,35 +171,35 @@ export const MarketDataDashboard = ({
                   <div className="grid grid-cols-2 gap-4">
                     <div className="result-tile">
                       <p className="text-xs uppercase tracking-widest text-slate-400">Spot Price</p>
-                      <p className="text-2xl font-mono text-white">${marketData.spot_price.toFixed(2)}</p>
+                      <p className="text-2xl font-mono text-white">${fmt(marketData.spot_price, 2)}</p>
                     </div>
                     <div className="result-tile">
                       <p className="text-xs uppercase tracking-widest text-slate-400">Spread</p>
-                      <p className="text-2xl font-mono text-white">${(marketData.ask - marketData.bid).toFixed(2)}</p>
+                      <p className="text-2xl font-mono text-white">${fmtExpr(() => marketData.ask - marketData.bid, 2)}</p>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="metric-pill">
                       <span className="text-xs text-slate-400">Bid</span>
-                      <span className="font-mono text-green-400">${marketData.bid.toFixed(2)}</span>
+                      <span className="font-mono text-green-400">${fmt(marketData.bid, 2)}</span>
                     </div>
                     <div className="metric-pill">
                       <span className="text-xs text-slate-400">Ask</span>
-                      <span className="font-mono text-red-400">${marketData.ask.toFixed(2)}</span>
+                      <span className="font-mono text-red-400">${fmt(marketData.ask, 2)}</span>
                     </div>
                   </div>
 
                   {marketData.implied_volatility && (
                     <div className="metric-pill">
                       <span className="text-xs text-slate-400">Implied Vol</span>
-                      <span className="font-mono">{(marketData.implied_volatility * 100).toFixed(1)}%</span>
+                      <span className="font-mono">{fmtExpr(() => (marketData.implied_volatility ?? NaN) * 100, 1)}%</span>
                     </div>
                   )}
 
                   <div className="text-xs text-slate-500 font-mono">
                     Last updated: {new Date(marketData.timestamp).toLocaleTimeString()} 
-                    ({marketData.data_age_seconds.toFixed(0)}s ago)
+                    ({fmt(marketData.data_age_seconds, 0)}s ago)
                   </div>
                 </div>
               )}
@@ -202,11 +215,11 @@ export const MarketDataDashboard = ({
                 <div className="grid grid-cols-2 gap-4">
                   <div className="result-tile">
                     <p className="text-xs uppercase tracking-widest text-slate-400">Theoretical</p>
-                    <p className="text-2xl font-mono text-blue-400">${comparison.theoretical_price.toFixed(4)}</p>
+                    <p className="text-2xl font-mono text-blue-400">${fmt(comparison.theoretical_price, 4)}</p>
                   </div>
                   <div className="result-tile">
                     <p className="text-xs uppercase tracking-widest text-slate-400">Market Mid</p>
-                    <p className="text-2xl font-mono text-white">${comparison.market_price.toFixed(4)}</p>
+                    <p className="text-2xl font-mono text-white">${fmt(comparison.market_price, 4)}</p>
                   </div>
                 </div>
 
@@ -215,18 +228,18 @@ export const MarketDataDashboard = ({
                     <div className="flex justify-between">
                       <span className="text-slate-400">Difference:</span>
                       <span className={`font-mono ${comparison.price_difference >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                        ${comparison.price_difference.toFixed(4)}
+                        ${fmt(comparison.price_difference, 4)}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-400">Difference %:</span>
                       <span className={`font-mono ${comparison.price_difference_percent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                        {comparison.price_difference_percent.toFixed(2)}%
+                        {fmt(comparison.price_difference_percent, 2)}%
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-400">Bid-Ask Spread:</span>
-                      <span className="font-mono text-slate-300">${comparison.spread.toFixed(4)}</span>
+                      <span className="font-mono text-slate-300">${fmt(comparison.spread, 4)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-400">Within Spread:</span>
@@ -298,17 +311,17 @@ export const MarketDataDashboard = ({
                     </tr>
                   </thead>
                   <tbody>
-                    {optionChain.calls.slice(0, 10).map((call, index) => {
+                    {optionChain.calls.slice(0, 10).map((call, _index) => {
                       const put = optionChain.puts.find(p => p.strike === call.strike);
                       return (
                         <tr key={call.strike} className="border-t border-slate-800 hover:bg-slate-900/50">
-                          <td className="px-4 py-3 font-semibold">${call.strike.toFixed(0)}</td>
-                          <td className="px-4 py-3 text-green-400">${call.bid.toFixed(2)}</td>
-                          <td className="px-4 py-3 text-red-400">${call.ask.toFixed(2)}</td>
-                          <td className="px-4 py-3">{(call.implied_volatility * 100).toFixed(1)}%</td>
-                          <td className="px-4 py-3 text-green-400">${put?.bid.toFixed(2) || 'N/A'}</td>
-                          <td className="px-4 py-3 text-red-400">${put?.ask.toFixed(2) || 'N/A'}</td>
-                          <td className="px-4 py-3">{put ? (put.implied_volatility * 100).toFixed(1) + '%' : 'N/A'}</td>
+                          <td className="px-4 py-3 font-semibold">${fmt(call.strike, 0)}</td>
+                          <td className="px-4 py-3 text-green-400">${fmt(call.bid, 2)}</td>
+                          <td className="px-4 py-3 text-red-400">${fmt(call.ask, 2)}</td>
+                          <td className="px-4 py-3">{fmtExpr(() => call.implied_volatility * 100, 1)}%</td>
+                          <td className="px-4 py-3 text-green-400">${fmt(put?.bid, 2) || 'N/A'}</td>
+                          <td className="px-4 py-3 text-red-400">${fmt(put?.ask, 2) || 'N/A'}</td>
+                          <td className="px-4 py-3">{put ? fmtExpr(() => put.implied_volatility * 100, 1) + '%' : 'N/A'}</td>
                         </tr>
                       );
                     })}

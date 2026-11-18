@@ -89,7 +89,7 @@ export const MarketplaceItemPage = () => {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.name || !form.email || !form.role) return;
+    if (!item || !form.name || !form.email || !form.role) return;
     setSubmitting(true);
     setSubmitError(null);
     try {

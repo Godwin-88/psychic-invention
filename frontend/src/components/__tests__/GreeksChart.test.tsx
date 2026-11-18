@@ -3,26 +3,26 @@ import { GreeksChart } from '../GreeksChart';
 import type { GreeksVisualizationData } from '@/types';
 
 // Mock canvas context (reuse from VolatilitySurfaceChart test)
-const mockGetContext = jest.fn();
+const mockGetContext = vi.fn();
 const mockCanvasContext = {
-  clearRect: jest.fn(),
-  fillRect: jest.fn(),
-  beginPath: jest.fn(),
-  moveTo: jest.fn(),
-  lineTo: jest.fn(),
-  stroke: jest.fn(),
-  fillText: jest.fn(),
-  save: jest.fn(),
-  restore: jest.fn(),
-  translate: jest.fn(),
-  rotate: jest.fn(),
-  arc: jest.fn(),
-  fill: jest.fn(),
-  set fillStyle(value: string) {},
-  set strokeStyle(value: string) {},
-  set lineWidth(value: number) {},
-  set font(value: string) {},
-  set textAlign(value: string) {}
+  clearRect: vi.fn(),
+  fillRect: vi.fn(),
+  beginPath: vi.fn(),
+  moveTo: vi.fn(),
+  lineTo: vi.fn(),
+  stroke: vi.fn(),
+  fillText: vi.fn(),
+  save: vi.fn(),
+  restore: vi.fn(),
+  translate: vi.fn(),
+  rotate: vi.fn(),
+  arc: vi.fn(),
+  fill: vi.fn(),
+  set fillStyle(_value: string) {},
+  set strokeStyle(_value: string) {},
+  set lineWidth(_value: number) {},
+  set font(_value: string) {},
+  set textAlign(_value: string) {}
 };
 
 beforeEach(() => {

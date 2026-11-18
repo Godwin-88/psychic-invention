@@ -97,7 +97,7 @@ export function SelectedAssetsProvider({ children }: { children: ReactNode }) {
 
   const searchUniverse = useCallback(async (query: string): Promise<{ symbol: string; type: AssetType; name: string }[]> => {
     if (!query.trim()) return [];
-    return searchAssets(query, selectedAssetType, 50);
+    return (await searchAssets(query, selectedAssetType, 50)) as { symbol: string; type: AssetType; name: string }[];
   }, [selectedAssetType]);
 
   return (

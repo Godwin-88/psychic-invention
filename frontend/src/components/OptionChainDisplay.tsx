@@ -105,7 +105,7 @@ export const OptionChainDisplay: React.FC<OptionChainDisplayProps> = ({
             </tr>
           </thead>
           <tbody>
-            {sortedData.map((option, index) => (
+            {sortedData.map((option, _index) => (
               <tr 
                 key={`${option.strike}-${option.expiration}`}
                 className={`border-b border-slate-800 hover:bg-slate-800/50 transition-colors ${getMoneynessClass(option.strike)}`}

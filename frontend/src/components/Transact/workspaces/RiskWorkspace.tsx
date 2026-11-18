@@ -223,7 +223,7 @@ function ActivePanel({ activeTab }: { activeTab: string }) {
 
 // ── Agent context sync ────────────────────────────────────────────────────────
 function useRiskAgentSync() {
-  const { varData, covHealthData, mstData, labels, weights, portfolioValue, alpha, horizonDays } = useRisk();
+  const { varData, covHealth: covHealthData, mstData, labels, weights, portfolioValue, alpha, horizonDays } = useRisk();
   const { setWorkspaceContext } = useAgentContext();
 
   useEffect(() => {

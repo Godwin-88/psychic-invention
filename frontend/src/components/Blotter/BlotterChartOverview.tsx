@@ -280,7 +280,7 @@ export function BlotterChartOverview({ onSymbolChange }: BlotterChartOverviewPro
   const [hoveredBar, setHoveredBar] = useState<BarPoint | null>(null);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [selectedBar, setSelectedBar] = useState<BarPoint | null>(null);
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [, setSelectedIndex] = useState<number | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef({ x: 0, viewStart: 0 });
@@ -324,7 +324,6 @@ export function BlotterChartOverview({ onSymbolChange }: BlotterChartOverviewPro
   const closes = data.map((b) => b.close);
   const sma20 = sma(closes, 20);
   const ema12 = ema(closes, 12);
-  const ema26 = ema(closes, 26);
   const rsi14 = rsi(closes, 14);
   const { macd: macdLine, signal: macdSignal, hist: macdHist } = macd(closes);
   const vwapSeries = vwap(data);
@@ -540,7 +539,7 @@ export function BlotterChartOverview({ onSymbolChange }: BlotterChartOverviewPro
       const maxAbsDelta = Math.max(...deltas.map(Math.abs), 1);
       const barH = 12;
       const y0 = h - margin.bottom - barH - 4;
-      visibleData.forEach((d, i) => {
+      visibleData.forEach((_d, i) => {
         const delta = deltas[i] ?? 0;
         const buyFrac = 0.5 + 0.5 * Math.max(-1, Math.min(1, delta / maxAbsDelta));
         const buyW = Math.max(1, (scaleX(i + 0.5) - scaleX(i - 0.5)) * 0.7);
@@ -559,7 +558,7 @@ export function BlotterChartOverview({ onSymbolChange }: BlotterChartOverviewPro
       ctx.strokeStyle = '#eab308';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      visibleData.forEach((d, i) => {
+      visibleData.forEach((_d, i) => {
         const idx = clampedViewStart + i;
         const v = sma20[idx];
         if (v == null) return;
@@ -572,7 +571,7 @@ export function BlotterChartOverview({ onSymbolChange }: BlotterChartOverviewPro
       ctx.strokeStyle = '#06b6d4';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      visibleData.forEach((d, i) => {
+      visibleData.forEach((_d, i) => {
         const idx = clampedViewStart + i;
         const v = ema12[idx];
         if (v == null) return;
@@ -629,7 +628,7 @@ export function BlotterChartOverview({ onSymbolChange }: BlotterChartOverviewPro
       ctx.lineWidth = 2;
       ctx.setLineDash([2, 2]);
       ctx.beginPath();
-      visibleData.forEach((d, i) => {
+      visibleData.forEach((_d, i) => {
         const idx = clampedViewStart + i;
         const v = vwapSeries[idx];
         if (v == null) return;
@@ -727,14 +726,14 @@ export function BlotterChartOverview({ onSymbolChange }: BlotterChartOverviewPro
     const useDelta = showWeeklyDeltaProfile || showDailyDeltaProfile;
     const useWeekly = showWeeklyVolProfile || showWeeklyDeltaProfile;
     const useDaily = showDailyVolProfile || showDailyDeltaProfile;
-    const { prices, volumes: volData, deltas: deltaData } = (() => {
+    const { volumes: volData, deltas: deltaData } = (() => {
       if (useWeekly) return useDelta
-        ? { prices: weeklyVolProfile.prices, volumes: weeklyVolProfile.volumes, deltas: weeklyDeltaProfile.deltas }
-        : { prices: weeklyVolProfile.prices, volumes: weeklyVolProfile.volumes, deltas: [] as number[] };
+        ? { volumes: weeklyVolProfile.volumes, deltas: weeklyDeltaProfile.deltas }
+        : { volumes: weeklyVolProfile.volumes, deltas: [] as number[] };
       if (useDaily) return useDelta
-        ? { prices: dailyVolProfile.prices, volumes: dailyVolProfile.volumes, deltas: dailyDeltaProfile.deltas }
-        : { prices: dailyVolProfile.prices, volumes: dailyVolProfile.volumes, deltas: [] as number[] };
-      return { prices: sessionProfile.prices, volumes: sessionProfile.volumes, deltas: sessionDeltaProfile.deltas };
+        ? { volumes: dailyVolProfile.volumes, deltas: dailyDeltaProfile.deltas }
+        : { volumes: dailyVolProfile.volumes, deltas: [] as number[] };
+      return { volumes: sessionProfile.volumes, deltas: sessionDeltaProfile.deltas };
     })();
     const values = useDelta ? deltaData : volData;
     const maxVal = Math.max(...values, 1);

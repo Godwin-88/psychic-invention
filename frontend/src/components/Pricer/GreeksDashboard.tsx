@@ -168,7 +168,7 @@ export const GreeksDashboard = () => {
   const [tau, setTau] = useState(0.25);
   const [r, setR] = useState(0.05);
   const [sigma, setSigma] = useState(0.2);
-  const [model, setModel] = useState<'bs' | 'fft' | 'numerical'>('bs');
+  const [] = useState<'bs' | 'fft' | 'numerical'>('bs');
   const [optionType, setOptionType] = useState<'call' | 'put'>('call');
   const [results, setResults] = useState<Record<string, { greeks: Record<string, number>; method: string }> | null>(null);
   const [loading, setLoading] = useState(false);

@@ -28,7 +28,7 @@ function computeGreek(
     const val = vary.min + t * (vary.max - vary.min);
     const req = { ...base, [vary.key]: val };
     const greeks = fn(req);
-    const y = (greeks as Record<string, number>)[field];
+    const y = (greeks as unknown as Record<string, number>)[field];
     pts.push({ x: val, y: Number.isFinite(y) ? y : 0 });
   }
   return pts;
@@ -38,7 +38,6 @@ function GreekChart({
   title,
   points,
   xLabel,
-  yFormat,
   color,
 }: {
   title: string;
@@ -47,7 +46,7 @@ function GreekChart({
   yFormat: (v: number) => string;
   color: string;
 }) {
-  const { path, xMin, xMax, yMin, yMax } = useMemo(() => {
+  const { path } = useMemo(() => {
     if (!points.length) return { path: '', xMin: 0, xMax: 1, yMin: 0, yMax: 1 };
     const xs = points.map((p) => p.x);
     const ys = points.map((p) => p.y);

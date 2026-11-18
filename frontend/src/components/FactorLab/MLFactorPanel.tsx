@@ -112,7 +112,6 @@ function LoadingsHeatmap({
   const heat = (v: number) => {
     const norm = v / maxAbs;         // -1 to +1
     if (norm >= 0) {
-      const b = Math.round(255 * (1 - norm));
       return `rgb(34,${Math.round(200 * (1 - norm))},${255})`;  // blue → cyan
     }
     const a = Math.round(255 * (-norm));

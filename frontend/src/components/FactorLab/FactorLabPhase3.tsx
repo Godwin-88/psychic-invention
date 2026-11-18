@@ -111,7 +111,7 @@ export const FactorLabPhase3 = () => {
           <div className="rounded-xl border border-slate-700 bg-slate-900/50 p-6">
             <h4 className="font-semibold text-white mb-2">Coskewness (M2)</h4>
             <p className="text-sm text-slate-400">Portfolio skewness: {(coskew.portfolio_skewness as number).toFixed(4)}</p>
-            {coskew.excess_kurtosis_warning && <p className="text-sm text-amber-400">Heavy tails warning</p>}
+            {Boolean(coskew.excess_kurtosis_warning) && <p className="text-sm text-amber-400">Heavy tails warning</p>}
           </div>
         )}
         {heston && (
@@ -126,7 +126,7 @@ export const FactorLabPhase3 = () => {
         )}
         {smartBeta && (
           <div className="rounded-xl border border-slate-700 bg-slate-900/50 p-6">
-            <h4 className="font-semibold text-white mb-2">Smart Beta ({smartBeta.method})</h4>
+            <h4 className="font-semibold text-white mb-2">Smart Beta ({String(smartBeta.method)})</h4>
             <p className="text-sm text-slate-400">Weights: {((smartBeta.weights as number[]).map((w) => (w * 100).toFixed(1)).join('% / '))}%</p>
           </div>
         )}

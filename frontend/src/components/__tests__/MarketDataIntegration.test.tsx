@@ -145,13 +145,6 @@ const mockSupportedSymbols = {
   note: 'Sample symbols for testing',
 };
 
-const mockBlackScholesResult = {
-  callPrice: 8.55,
-  putPrice: 5.85,
-  model: 'Black-Scholes',
-  responseTime: 15,
-};
-
 describe('Market Data Integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -218,7 +211,7 @@ describe('Market Data Integration', () => {
       });
       
       // Set expiry date and fetch option chain
-      const expiryInput = screen.getByDisplayValue('2024-03-15');
+      screen.getByDisplayValue('2024-03-15');
       const fetchChainButton = screen.getByText('Fetch Chain');
       
       fireEvent.click(fetchChainButton);

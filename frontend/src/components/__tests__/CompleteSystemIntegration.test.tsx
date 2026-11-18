@@ -180,7 +180,7 @@ describe('Complete System Integration', () => {
   });
 
   it('should handle market data integration workflow', async () => {
-    render(<PricingWorkspace showMarketData={true} />);
+    render(<PricingWorkspace />);
 
     // Wait for market data components to load
     await waitFor(() => {
@@ -299,7 +299,7 @@ describe('Complete System Integration', () => {
   });
 
   it('should handle market data symbol selection', async () => {
-    render(<PricingWorkspace showMarketData={true} />);
+    render(<PricingWorkspace />);
 
     // Wait for market data to load
     await waitFor(() => {

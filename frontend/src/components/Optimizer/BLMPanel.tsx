@@ -83,7 +83,7 @@ interface ViewRow {
 
 // ── Main panel ───────────────────────────────────────────────────────────────
 export const BLMPanel = () => {
-  const { mu, cov, labels, blmResult, computeBLM, blmLoading, rfRate, longOnly, error } = useOptimizer();
+  const { mu, cov, labels, blmResult, computeBLM, blmLoading, error } = useOptimizer();
 
   const N = labels.length;
   const [tau, setTau] = useState(0.025);

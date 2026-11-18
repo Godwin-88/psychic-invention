@@ -1,4 +1,3 @@
-import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -314,6 +313,7 @@ describe('PricingWorkspace Form Validation', () => {
         expect(input).not.toBeDisabled(); // Should not be disabled by default
       });
     });
+  });
 });
 
 describe('Results Display Components', () => {

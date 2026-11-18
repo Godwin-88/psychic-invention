@@ -87,7 +87,7 @@ export const MarketplaceStage = () => {
   const [activeCategories, setActiveCategories] = useState<MenuCategory[]>([]);
   const [activeComplexities, setActiveComplexities] = useState<Complexity[]>([]);
 
-  const toggle = <T,>(list: T[], setList: React.Dispatch<React.SetStateAction<T[]>>, item: T) =>
+  const toggle = <T,>(_list: T[], setList: React.Dispatch<React.SetStateAction<T[]>>, item: T) =>
     setList(prev => prev.includes(item) ? prev.filter(x => x !== item) : [...prev, item]);
 
   const hasFilters = activeRoles.length > 0 || activeCategories.length > 0 || activeComplexities.length > 0 || search.trim();

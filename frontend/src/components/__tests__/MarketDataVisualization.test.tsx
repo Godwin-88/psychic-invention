@@ -3,7 +3,7 @@ import { MarketDataVisualization } from '../MarketDataVisualization';
 import type { VolatilitySurfaceData, GreeksVisualizationData, OptionChainData } from '@/types';
 
 // Mock the chart components
-jest.mock('../VolatilitySurfaceChart', () => ({
+vi.mock('../VolatilitySurfaceChart', () => ({
   VolatilitySurfaceChart: ({ data }: { data: VolatilitySurfaceData }) => (
     <div data-testid="volatility-surface-chart">
       Volatility Surface Chart - {data.strikes.length} strikes
@@ -11,7 +11,7 @@ jest.mock('../VolatilitySurfaceChart', () => ({
   )
 }));
 
-jest.mock('../GreeksChart', () => ({
+vi.mock('../GreeksChart', () => ({
   GreeksChart: ({ data, selectedGreek }: { data: GreeksVisualizationData, selectedGreek: string }) => (
     <div data-testid="greeks-chart">
       Greeks Chart - {selectedGreek} - {data.spotPrices.length} points
@@ -19,7 +19,7 @@ jest.mock('../GreeksChart', () => ({
   )
 }));
 
-jest.mock('../OptionChainDisplay', () => ({
+vi.mock('../OptionChainDisplay', () => ({
   OptionChainDisplay: ({ data }: { data: OptionChainData[] }) => (
     <div data-testid="option-chain-display">
       Option Chain - {data.length} options

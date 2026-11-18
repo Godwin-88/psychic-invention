@@ -110,7 +110,7 @@ export const OptimizerPhase2 = () => {
         )}
         {riskParity && (
           <div className="rounded-xl border border-slate-700 bg-slate-900/50 p-6">
-            <h4 className="font-semibold text-white mb-2">Risk Parity ({riskParity.method})</h4>
+            <h4 className="font-semibold text-white mb-2">Risk Parity ({String(riskParity.method)})</h4>
             <p className="text-sm text-slate-400">Weights: {(riskParity.weights as number[]).map((w) => (w * 100).toFixed(1)).join('% / ')}%</p>
             <p className="text-sm text-slate-400">Vol: {((riskParity.volatility as number) * 100).toFixed(2)}%</p>
           </div>

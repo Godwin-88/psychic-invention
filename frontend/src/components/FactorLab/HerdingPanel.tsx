@@ -7,7 +7,6 @@
 import { useFactorContext } from '@/context/FactorContext';
 import { MathText } from '@/components/ui/Math';
 
-const pct  = (v: number) => (v * 100).toFixed(2) + '%';
 const fmt3 = (v: number) => v.toFixed(3);
 
 // ── Crowding gauge ─────────────────────────────────────────────────────────────
@@ -57,7 +56,7 @@ function CrowdingGauge({ index, level }: { index: number; level: string }) {
       <text x={cx} y={cy - 20} fontSize="16" fontWeight="bold" fill={col} textAnchor="middle">
         {(index * 100).toFixed(0)}
       </text>
-      <text x={cx} y={cy - 6} fontSize="9" fill={col} textAnchor="middle" textTransform="uppercase">
+      <text x={cx} y={cy - 6} fontSize="9" fill={col} textAnchor="middle">
         {level.toUpperCase()}
       </text>
     </svg>

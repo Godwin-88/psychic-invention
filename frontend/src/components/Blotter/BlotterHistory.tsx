@@ -42,7 +42,7 @@ export const BlotterHistory = () => {
     const headers = ['id', 'asset', 'direction', 'quantity', 'entry_price', 'entry_date', 'strategy_tag'];
     const rows = history.map((t) =>
       headers.map((h) => {
-        const v = (t as Record<string, unknown>)[h];
+        const v = (t as unknown as Record<string, unknown>)[h];
         return typeof v === 'string' && v.includes(',') ? `"${v}"` : String(v ?? '');
       }).join(',')
     );
