@@ -148,34 +148,15 @@ def get_accounts_balances(as_of_date: Optional[str] = None) -> List[Dict[str, An
 
 
 def get_positions_from_db(current_prices: Dict[str, float]) -> List[Dict[str, Any]]:
-    """Aggregate trades into positions with P&L (from DB)."""
-    trades = get_trades_from_db()
-    by_key: Dict[tuple, Dict[str, Any]] = {}
-    for t in trades:
-        key = (t["asset"], t["direction"])
-        mult = 1 if t["direction"] == "long" else -1
-        qty = t["quantity"] * mult
-        if key not in by_key:
-            by_key[key] = {"qty": 0, "cost": 0.0, "entry_date": t["entry_date"]}
-        by_key[key]["qty"] += qty
-        by_key[key]["cost"] += qty * t["entry_price"]
-    out = []
-    for (asset, direction), data in by_key.items():
-        qty = data["qty"]
-        if qty == 0:
-            continue
-        avg = data["cost"] / qty
-        cur = current_prices.get(asset, avg)
-        pnl = (cur - avg) * qty
-        pnl_pct = (pnl / (avg * abs(qty)) * 100) if avg * qty != 0 else 0
-        out.append({
-            "asset": asset,
-            "quantity": abs(qty),
-            "direction": "long" if qty > 0 else "short",
-            "entry_price": avg,
-            "entry_date": data["entry_date"],
-            "current_price": cur,
-            "unrealized_pnl": pnl,
-            "unrealized_pnl_pct": pnl_pct,
-        })
-    return out
+    """Net FIFO positions with realised/unrealised P&L (from DB).
+
+    Uses the same position engine as the in-memory store. The trades table has
+    no fees/multiplier columns yet, so fees = 0 and multiplier = 1 here.
+    """
+    from .position_engine import build_books, position_views
+
+    # get_trades_from_db returns newest first; replay oldest first, keeping
+    # insertion order within a date.
+    trades = list(reversed(get_trades_from_db()))
+    trades.sort(key=lambda t: t["entry_date"])
+    return [v.to_dict() for v in position_views(build_books(trades), current_prices)]

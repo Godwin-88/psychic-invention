@@ -3,7 +3,7 @@ Transact Phase 1 Routes — Portfolio, Risk, Optimizer, Blotter
 """
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List
 import numpy as np
 
@@ -968,11 +968,13 @@ def get_blotter_instruments(asset_type: Optional[str] = "equity"):
 
 # --- Blotter: Trade Entry, Positions, History ---
 class TradeEntryRequest(BaseModel):
-    asset: str
-    direction: str  # "long" | "short"
-    quantity: float
-    entry_price: float
-    entry_date: Optional[str] = None
+    asset: str = Field(..., min_length=1, max_length=64)
+    direction: str = Field(..., description='"long" = buy, "short" = sell')
+    quantity: float = Field(..., gt=0, description="Units (positive; side via direction)")
+    entry_price: float = Field(..., gt=0)
+    entry_date: Optional[str] = Field(None, pattern=r"^\d{4}-\d{2}-\d{2}$")
+    fees: float = Field(0.0, ge=0, description="Total commission for the fill")
+    multiplier: float = Field(1.0, gt=0, description="Contract multiplier (100 for US equity options)")
     model_used: Optional[str] = None
     theoretical_price: Optional[float] = None
     strategy_tag: Optional[str] = None
@@ -1014,6 +1016,8 @@ def post_blotter_trade(req: TradeEntryRequest):
             theoretical_price=req.theoretical_price,
             strategy_tag=req.strategy_tag,
             asset_class=req.asset_class,
+            fees=req.fees,
+            multiplier=req.multiplier,
         )
         return {
             "id": trade.id,
@@ -1022,6 +1026,8 @@ def post_blotter_trade(req: TradeEntryRequest):
             "quantity": trade.quantity,
             "entry_price": trade.entry_price,
             "entry_date": trade.entry_date,
+            "fees": trade.fees,
+            "multiplier": trade.multiplier,
         }
     except HTTPException:
         raise
@@ -1041,20 +1047,7 @@ def get_blotter_positions(current_prices: Optional[str] = None):
             return {"positions": positions}
         store = get_trade_store()
         positions = store.get_positions(prices_dict)
-        return {
-            "positions": [
-                {
-                    "asset": p.asset,
-                    "quantity": p.quantity,
-                    "direction": p.direction,
-                    "entry_price": p.entry_price,
-                    "current_price": p.current_price,
-                    "unrealized_pnl": p.unrealized_pnl,
-                    "unrealized_pnl_pct": p.unrealized_pnl_pct,
-                }
-                for p in positions
-            ]
-        }
+        return {"positions": [p.to_dict() for p in positions]}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -1068,20 +1061,7 @@ def post_blotter_positions(req: PositionsRequest):
             return {"positions": positions}
         store = get_trade_store()
         positions = store.get_positions(req.current_prices)
-        return {
-            "positions": [
-                {
-                    "asset": p.asset,
-                    "quantity": p.quantity,
-                    "direction": p.direction,
-                    "entry_price": p.entry_price,
-                    "current_price": p.current_price,
-                    "unrealized_pnl": p.unrealized_pnl,
-                    "unrealized_pnl_pct": p.unrealized_pnl_pct,
-                }
-                for p in positions
-            ]
-        }
+        return {"positions": [p.to_dict() for p in positions]}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -1391,17 +1371,12 @@ def post_blotter_pnl(req: PnLRequest):
             )
             return {"timeseries": series}
         if req.current_prices:
-            cum = store.get_cumulative_pnl(req.current_prices)
-            positions = store.get_positions(req.current_prices)
+            summary = store.get_pnl_summary(req.current_prices)
+            positions = store.get_positions(req.current_prices, include_flat=True)
             return {
-                "cumulative_pnl": cum,
-                "positions": [
-                    {
-                        "asset": p.asset,
-                        "unrealized_pnl": p.unrealized_pnl,
-                    }
-                    for p in positions
-                ],
+                "cumulative_pnl": summary["net_pnl"],
+                **summary,
+                "positions": [p.to_dict() for p in positions],
             }
         raise HTTPException(status_code=400, detail="Provide price_history or current_prices")
     except HTTPException:
