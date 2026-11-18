@@ -45,8 +45,7 @@ fn benchmark_black_scholes(c: &mut Criterion) {
                 black_box(K), 
                 black_box(TAU),
                 black_box(R),
-                black_box(SIGMA)
-            ))
+                black_box(SIGMA), 0.0))
         })
     });
     
@@ -57,8 +56,7 @@ fn benchmark_black_scholes(c: &mut Criterion) {
                 black_box(K),
                 black_box(TAU), 
                 black_box(R),
-                black_box(SIGMA)
-            ))
+                black_box(SIGMA), 0.0))
         })
     });
     
@@ -72,8 +70,7 @@ fn benchmark_black_scholes(c: &mut Criterion) {
                     black_box(strike),
                     black_box(TAU),
                     black_box(R), 
-                    black_box(SIGMA)
-                ));
+                    black_box(SIGMA), 0.0));
             }
         })
     });
@@ -92,8 +89,7 @@ fn benchmark_fft_pricing(c: &mut Criterion) {
                 black_box(K),
                 black_box(TAU),
                 black_box(R),
-                black_box(SIGMA)
-            ))
+                black_box(SIGMA), 0.0))
         })
     });
     
@@ -104,8 +100,7 @@ fn benchmark_fft_pricing(c: &mut Criterion) {
                 black_box(K),
                 black_box(TAU),
                 black_box(R),
-                black_box(SIGMA)
-            ))
+                black_box(SIGMA), 0.0))
         })
     });
     
@@ -128,8 +123,7 @@ fn benchmark_fft_pricing(c: &mut Criterion) {
                 black_box(TAU),
                 black_box(R),
                 black_box(SIGMA),
-                black_box(alpha)
-            ))
+                black_box(alpha), 0.0))
         })
     });
     
@@ -143,8 +137,7 @@ fn benchmark_fft_pricing(c: &mut Criterion) {
                     black_box(strike),
                     black_box(TAU),
                     black_box(R),
-                    black_box(SIGMA)
-                ));
+                    black_box(SIGMA), 0.0));
             }
         })
     });
@@ -167,8 +160,7 @@ fn benchmark_heston_pricing(c: &mut Criterion) {
                 black_box(THETA),
                 black_box(SIGMA_V),
                 black_box(RHO),
-                black_box(TAU)
-            ))
+                black_box(TAU), 0.0))
         })
     });
     
@@ -183,8 +175,7 @@ fn benchmark_heston_pricing(c: &mut Criterion) {
                 black_box(THETA),
                 black_box(SIGMA_V),
                 black_box(RHO),
-                black_box(TAU)
-            ))
+                black_box(TAU), 0.0))
         })
     });
     
@@ -202,8 +193,7 @@ fn benchmark_heston_pricing(c: &mut Criterion) {
                     black_box(THETA),
                     black_box(SIGMA_V),
                     black_box(RHO),
-                    black_box(TAU)
-                ));
+                    black_box(TAU), 0.0));
             }
         })
     });
@@ -222,8 +212,7 @@ fn benchmark_greeks_calculations(c: &mut Criterion) {
                 black_box(K),
                 black_box(TAU),
                 black_box(R),
-                black_box(SIGMA)
-            ))
+                black_box(SIGMA), 0.0))
         })
     });
     
@@ -234,8 +223,7 @@ fn benchmark_greeks_calculations(c: &mut Criterion) {
                 black_box(K),
                 black_box(TAU),
                 black_box(R),
-                black_box(SIGMA)
-            ))
+                black_box(SIGMA), 0.0))
         })
     });
     
@@ -246,8 +234,7 @@ fn benchmark_greeks_calculations(c: &mut Criterion) {
                 black_box(K),
                 black_box(TAU),
                 black_box(R),
-                black_box(SIGMA)
-            ))
+                black_box(SIGMA), 0.0))
         })
     });
     
@@ -258,8 +245,7 @@ fn benchmark_greeks_calculations(c: &mut Criterion) {
                 black_box(K),
                 black_box(TAU),
                 black_box(R),
-                black_box(SIGMA)
-            ))
+                black_box(SIGMA), 0.0))
         })
     });
     
@@ -274,8 +260,7 @@ fn benchmark_greeks_calculations(c: &mut Criterion) {
                 black_box(THETA),
                 black_box(KAPPA),
                 black_box(SIGMA_V),
-                black_box(RHO)
-            ))
+                black_box(RHO), 0.0))
         })
     });
     
@@ -289,8 +274,7 @@ fn benchmark_greeks_calculations(c: &mut Criterion) {
                     black_box(strike),
                     black_box(TAU),
                     black_box(R),
-                    black_box(SIGMA)
-                ));
+                    black_box(SIGMA), 0.0));
             }
         })
     });
@@ -310,19 +294,19 @@ fn benchmark_mixed_workload(c: &mut Criterion) {
                 
                 // 40% Black-Scholes pricing
                 if i % 5 < 2 {
-                    black_box(price_call(S, strike, TAU, R, SIGMA));
+                    black_box(price_call(S, strike, TAU, R, SIGMA, 0.0));
                 }
                 // 30% FFT pricing
                 else if i % 5 < 3 {
-                    black_box(price_call_fft_optimized(S, strike, TAU, R, SIGMA));
+                    black_box(price_call_fft_optimized(S, strike, TAU, R, SIGMA, 0.0));
                 }
                 // 20% Greeks calculations
                 else if i % 5 < 4 {
-                    black_box(calculate_bs_call_greeks(S, strike, TAU, R, SIGMA));
+                    black_box(calculate_bs_call_greeks(S, strike, TAU, R, SIGMA, 0.0));
                 }
                 // 10% Heston pricing (more expensive)
                 else {
-                    black_box(price_heston_call(S, strike, V0, R, KAPPA, THETA, SIGMA_V, RHO, TAU));
+                    black_box(price_heston_call(S, strike, V0, R, KAPPA, THETA, SIGMA_V, RHO, TAU, 0.0));
                 }
             }
         })
@@ -333,8 +317,8 @@ fn benchmark_mixed_workload(c: &mut Criterion) {
             // High-frequency Black-Scholes only workload
             for i in 0..200 {
                 let strike = 98.0 + (i as f64) * 0.02;
-                black_box(price_call(S, strike, TAU, R, SIGMA));
-                black_box(calculate_bs_call_greeks(S, strike, TAU, R, SIGMA));
+                black_box(price_call(S, strike, TAU, R, SIGMA, 0.0));
+                black_box(calculate_bs_call_greeks(S, strike, TAU, R, SIGMA, 0.0));
             }
         })
     });
@@ -358,8 +342,7 @@ fn benchmark_parameter_variations(c: &mut Criterion) {
                         black_box(K),
                         black_box(TAU),
                         black_box(R),
-                        black_box(vol)
-                    ))
+                        black_box(vol), 0.0))
                 })
             }
         );
@@ -377,8 +360,7 @@ fn benchmark_parameter_variations(c: &mut Criterion) {
                         black_box(K),
                         black_box(tau),
                         black_box(R),
-                        black_box(SIGMA)
-                    ))
+                        black_box(SIGMA), 0.0))
                 })
             }
         );
@@ -401,8 +383,7 @@ fn benchmark_parameter_variations(c: &mut Criterion) {
                         black_box(THETA),
                         black_box(SIGMA_V),
                         black_box(RHO),
-                        black_box(TAU)
-                    ))
+                        black_box(TAU), 0.0))
                 })
             }
         );

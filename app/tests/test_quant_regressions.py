@@ -136,3 +136,76 @@ def test_heston_negative_rho_creates_downside_skew():
         args["s"], 120, args["v0"], args["r"], args["kappa"], args["theta"], args["xi"], 0.0, args["tau"]
     )
     assert otm_call_neg < otm_call_zero
+
+
+# ── Greeks unit conventions (all methods must agree) ─────────────────────────
+
+
+@pytest.mark.parametrize("kind", ["call", "put"])
+def test_analytical_numerical_fft_greeks_share_units(kind):
+    args = (100.0, 105.0, 0.75, 0.04, 0.25)
+    a = getattr(pricing_engine, f"calculate_bs_{kind}_greeks")(*args)
+    n = getattr(pricing_engine, f"calculate_numerical_{kind}_greeks")(*args)
+    f = getattr(pricing_engine, f"calculate_fft_{kind}_greeks")(*args)
+    for g in ("delta", "gamma", "theta", "vega", "rho"):
+        assert getattr(n, g) == pytest.approx(getattr(a, g), rel=1e-4, abs=1e-6), g
+        assert getattr(f, g) == pytest.approx(getattr(a, g), rel=2e-3, abs=1e-5), g
+
+
+def test_vega_is_per_vol_point_and_theta_per_day():
+    g = pricing_engine.calculate_bs_call_greeks(100, 100, 1.0, 0.05, 0.2)
+    bump = pricing_engine.price_call(100, 100, 1.0, 0.05, 0.21) - pricing_engine.price_call(100, 100, 1.0, 0.05, 0.2)
+    assert g.vega == pytest.approx(bump, rel=0.02)
+    day = pricing_engine.price_call(100, 100, 1.0 - 1 / 365, 0.05, 0.2) - pricing_engine.price_call(100, 100, 1.0, 0.05, 0.2)
+    assert g.theta == pytest.approx(day, rel=0.02)
+
+
+def test_heston_vega_is_nonzero():
+    g = pricing_engine.calculate_heston_call_greeks(100, 100, 1.0, 0.05, 0.04, 0.04, 2.0, 0.3, -0.7)
+    assert g.vega > 0.05
+
+
+# ── Dividends, American, Monte Carlo ──────────────────────────────────────────
+
+
+def test_dividend_yield_matches_merton_and_parity():
+    s, k, t, r, sig, q = 100, 95, 0.5, 0.04, 0.3, 0.025
+    c = pricing_engine.price_call(s, k, t, r, sig, q)
+    p = pricing_engine.price_put(s, k, t, r, sig, q)
+    assert c - p == pytest.approx(s * math.exp(-q * t) - k * math.exp(-r * t), abs=1e-10)
+    assert c == pytest.approx(_bs_call(s * math.exp(-q * t), k, r, sig, t), abs=1e-10)
+    assert pricing_engine.price_call_fft_optimized(s, k, t, r, sig, q) == pytest.approx(c, abs=2e-4)
+    g = pricing_engine.calculate_bs_call_greeks(s, k, t, r, sig, q)
+    h = 1e-3
+    fd = (pricing_engine.price_call(s + h, k, t, r, sig, q) - pricing_engine.price_call(s - h, k, t, r, sig, q)) / (2 * h)
+    assert g.delta == pytest.approx(fd, rel=1e-6)
+
+
+def test_american_put_benchmark_and_bounds():
+    price, delta, gamma, premium = pricing_engine.price_american(36, 40, 1.0, 0.06, 0.2)
+    assert price == pytest.approx(4.4867, abs=3e-4)
+    assert premium > 0 and -1 < delta < 0 and gamma > 0
+    eu_call = pricing_engine.price_call(100, 100, 1.0, 0.05, 0.2)
+    am_call = pricing_engine.price_american(100, 100, 1.0, 0.05, 0.2, 0.0, True)[0]
+    assert am_call == pytest.approx(eu_call, abs=1e-3)
+
+
+def test_monte_carlo_is_seeded_and_within_confidence_interval():
+    a = pricing_engine.price_mc_with_error(100, 100, 1.0, 0.05, 0.2, 200_000, True, 11)
+    b = pricing_engine.price_mc_with_error(100, 100, 1.0, 0.05, 0.2, 200_000, True, 11)
+    assert a == b
+    bs = _bs_call(100, 100, 0.05, 0.2, 1.0)
+    assert abs(a[0] - bs) < 4 * a[1]
+
+
+def test_reference_engine_matches_rust():
+    import pricing_engine_mock as ref
+
+    cases = [
+        ("price_call", (100, 90, 0.5, 0.03, 0.25, 0.01), 1e-8),
+        ("price_put", (100, 110, 2.0, 0.03, 0.35, 0.02), 1e-8),
+        ("price_heston_call", (100, 100, 0.04, 0.05, 2.0, 0.04, 0.3, -0.7, 1.0, 0.02), 1e-6),
+    ]
+    for fn, args, tol in cases:
+        assert getattr(ref, fn)(*args) == pytest.approx(getattr(pricing_engine, fn)(*args), abs=tol), fn
+    assert ref.price_american(36, 40, 1.0, 0.06, 0.2)[0] == pytest.approx(4.4867, abs=1e-3)

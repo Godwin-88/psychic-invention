@@ -153,6 +153,7 @@ fn integrate_panels(f: impl Fn(f64) -> f64, a: f64, b: f64, panels: usize, tol: 
 /// P2 = ½ + (1/π)∫₀^∞ Re[ e^{−iu ln K} φ(u) / (iu) ] du
 ///
 /// where φ is the characteristic function of ln S_T and φ(−i) = E[S_T] = S·e^{rτ}.
+#[allow(clippy::too_many_arguments)]
 fn price_heston_call_impl(
     s: f64,
     k: f64,
@@ -163,6 +164,7 @@ fn price_heston_call_impl(
     xi: f64,
     rho: f64,
     tau: f64,
+    q: f64,
 ) -> Result<f64, HestonError> {
     validate_heston_parameters(v0, kappa, theta, xi, rho)?;
     if s <= 0.0 || k <= 0.0 {
@@ -172,18 +174,21 @@ fn price_heston_call_impl(
         return Ok((s - k).max(0.0));
     }
 
+    // With a dividend yield the log-price drifts at r − q; φ is evaluated
+    // with that drift and the spot leg is discounted at q.
+    let drift = r - q;
     let i = Complex::i();
     let ln_k = k.ln();
-    let forward = s * (r * tau).exp(); // φ(−i)
+    let forward = s * (drift * tau).exp(); // φ(−i)
 
     let p1_integrand = |u: f64| -> f64 {
         let uc = Complex::new(u, 0.0);
-        let cf_val = cf_heston_impl(uc - i, s, v0, r, kappa, theta, xi, rho, tau);
+        let cf_val = cf_heston_impl(uc - i, s, v0, drift, kappa, theta, xi, rho, tau);
         ((-i * uc * ln_k).exp() * cf_val / (i * uc * forward)).re
     };
     let p2_integrand = |u: f64| -> f64 {
         let uc = Complex::new(u, 0.0);
-        let cf_val = cf_heston_impl(uc, s, v0, r, kappa, theta, xi, rho, tau);
+        let cf_val = cf_heston_impl(uc, s, v0, drift, kappa, theta, xi, rho, tau);
         ((-i * uc * ln_k).exp() * cf_val / (i * uc)).re
     };
 
@@ -202,15 +207,18 @@ fn price_heston_call_impl(
 
     let p1 = 0.5 + i1 / PI;
     let p2 = 0.5 + i2 / PI;
-    let call_price = s * p1 - k * (-r * tau).exp() * p2;
+    let spot_pv = s * (-q * tau).exp();
+    let call_price = spot_pv * p1 - k * (-r * tau).exp() * p2;
 
-    // Enforce no-arbitrage bounds: max(S − K e^{−rτ}, 0) ≤ C ≤ S.
-    let lower_bound = (s - k * (-r * tau).exp()).max(0.0);
-    Ok(call_price.clamp(lower_bound, s))
+    // Enforce no-arbitrage bounds: max(S e^{−qτ} − K e^{−rτ}, 0) ≤ C ≤ S e^{−qτ}.
+    let lower_bound = (spot_pv - k * (-r * tau).exp()).max(0.0);
+    Ok(call_price.clamp(lower_bound, spot_pv))
 }
 
 /// Heston call pricing via numeric integration
 #[pyfunction]
+#[pyo3(signature = (s, k, v0, r, kappa, theta, xi, rho, tau, q=0.0))]
+#[allow(clippy::too_many_arguments)]
 pub fn price_heston_call(
     s: f64,
     k: f64,
@@ -221,8 +229,9 @@ pub fn price_heston_call(
     xi: f64,
     rho: f64,
     tau: f64,
+    q: f64,
 ) -> PyResult<f64> {
-    match price_heston_call_impl(s, k, v0, r, kappa, theta, xi, rho, tau) {
+    match price_heston_call_impl(s, k, v0, r, kappa, theta, xi, rho, tau, q) {
         Ok(price) => Ok(price),
         Err(e) => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string())),
     }
@@ -234,9 +243,10 @@ pub fn validate_feller_condition_py(kappa: f64, theta: f64, xi: f64) -> PyResult
     Ok(validate_feller_condition(kappa, theta, xi).is_ok())
 }
 
-/// Stub for Heston *put* pricing via put–call parity:
-/// P = C - S + K * exp(-r * τ)
+/// Heston put via put–call parity.
 #[pyfunction]
+#[pyo3(signature = (s, k, v0, r, kappa, theta, xi, rho, tau, q=0.0))]
+#[allow(clippy::too_many_arguments)]
 pub fn price_heston_put(
     s: f64,
     k: f64,
@@ -247,10 +257,12 @@ pub fn price_heston_put(
     xi: f64,
     rho: f64,
     tau: f64,
+    q: f64,
 ) -> PyResult<f64> {
-    let c = price_heston_call(s, k, v0, r, kappa, theta, xi, rho, tau)?;
-    let p = c - s + k * (-r * tau).exp();
-    Ok(p)
+    let c = price_heston_call(s, k, v0, r, kappa, theta, xi, rho, tau, q)?;
+    // Put–call parity with dividends: P = C − S e^{−qτ} + K e^{−rτ}
+    let p = c - s * (-q * tau).exp() + k * (-r * tau).exp();
+    Ok(p.max(0.0))
 }
 
 
@@ -266,7 +278,7 @@ mod tests {
     fn heston_matches_reference_value() {
         // Standard benchmark: S=K=100, v0=θ=0.04, κ=2, ξ=0.3, ρ=−0.7, r=5%, τ=1
         // Reference ≈ 10.3942 (independent quadrature check).
-        let c = price_heston_call_impl(100.0, 100.0, 0.04, 0.05, 2.0, 0.04, 0.3, -0.7, 1.0).unwrap();
+        let c = price_heston_call_impl(100.0, 100.0, 0.04, 0.05, 2.0, 0.04, 0.3, -0.7, 1.0, 0.0).unwrap();
         assert!((c - 10.3942).abs() < 1e-3, "got {c}");
     }
 
@@ -274,7 +286,7 @@ mod tests {
     fn heston_converges_to_black_scholes_as_vol_of_vol_vanishes() {
         // ξ → 0 with v0 = θ ⇒ constant variance ⇒ Black–Scholes with σ = √θ.
         for &k in &[80.0, 100.0, 120.0] {
-            let h = price_heston_call_impl(100.0, k, 0.04, 0.05, 2.0, 0.04, 0.01, 0.0, 1.0).unwrap();
+            let h = price_heston_call_impl(100.0, k, 0.04, 0.05, 2.0, 0.04, 0.01, 0.0, 1.0, 0.0).unwrap();
             let bs = bs_call(100.0, k, 0.05, 0.2, 1.0);
             assert!((h - bs).abs() < 5e-3, "K={k}: heston {h} vs bs {bs}");
         }
@@ -287,10 +299,18 @@ mod tests {
     }
 
     #[test]
+    fn heston_with_dividend_reduces_to_merton() {
+        let q = 0.03;
+        let h = price_heston_call_impl(100.0, 100.0, 0.04, 0.05, 2.0, 0.04, 0.01, 0.0, 1.0, q).unwrap();
+        let bs = bs_call(100.0 * (-q as f64).exp(), 100.0, 0.05, 0.2, 1.0);
+        assert!((h - bs).abs() < 5e-3, "heston {h} vs merton {bs}");
+    }
+
+    #[test]
     fn heston_short_maturity_and_otm_are_sane() {
-        let c = price_heston_call_impl(100.0, 130.0, 0.04, 0.01, 1.5, 0.04, 0.3, -0.5, 0.05).unwrap();
+        let c = price_heston_call_impl(100.0, 130.0, 0.04, 0.01, 1.5, 0.04, 0.3, -0.5, 0.05, 0.0).unwrap();
         assert!(c >= 0.0 && c < 0.5, "got {c}");
-        let c2 = price_heston_call_impl(100.0, 70.0, 0.04, 0.01, 1.5, 0.04, 0.3, -0.5, 0.05).unwrap();
+        let c2 = price_heston_call_impl(100.0, 70.0, 0.04, 0.01, 1.5, 0.04, 0.3, -0.5, 0.05, 0.0).unwrap();
         assert!((c2 - (100.0 - 70.0 * (-0.01f64 * 0.05).exp())).abs() < 0.05, "got {c2}");
     }
 }

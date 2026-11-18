@@ -167,7 +167,7 @@ impl TimedPricingEngine {
         s: f64, k: f64, tau: f64, r: f64, sigma: f64
     ) -> PyResult<f64> {
         let start = Instant::now();
-        let result = crate::black_scholes::price_call(s, k, tau, r, sigma);
+        let result = crate::black_scholes::price_call(s, k, tau, r, sigma, 0.0);
         let duration = start.elapsed();
         GLOBAL_MONITOR.record_operation("bs_call", duration);
         result
@@ -178,7 +178,7 @@ impl TimedPricingEngine {
         s: f64, k: f64, tau: f64, r: f64, sigma: f64
     ) -> PyResult<f64> {
         let start = Instant::now();
-        let result = crate::black_scholes::price_put(s, k, tau, r, sigma);
+        let result = crate::black_scholes::price_put(s, k, tau, r, sigma, 0.0);
         let duration = start.elapsed();
         GLOBAL_MONITOR.record_operation("bs_put", duration);
         result
@@ -189,7 +189,7 @@ impl TimedPricingEngine {
         s: f64, k: f64, tau: f64, r: f64, sigma: f64
     ) -> PyResult<f64> {
         let start = Instant::now();
-        let result = crate::fft_pricing_enhanced::price_call_fft_optimized(s, k, tau, r, sigma);
+        let result = crate::fft_pricing_enhanced::price_call_fft_optimized(s, k, tau, r, sigma, 0.0);
         let duration = start.elapsed();
         GLOBAL_MONITOR.record_operation("fft_call", duration);
         result
@@ -200,7 +200,7 @@ impl TimedPricingEngine {
         s: f64, k: f64, v0: f64, r: f64, kappa: f64, theta: f64, sigma_v: f64, rho: f64, tau: f64
     ) -> PyResult<f64> {
         let start = Instant::now();
-        let result = crate::heston::price_heston_call(s, k, v0, r, kappa, theta, sigma_v, rho, tau);
+        let result = crate::heston::price_heston_call(s, k, v0, r, kappa, theta, sigma_v, rho, tau, 0.0);
         let duration = start.elapsed();
         GLOBAL_MONITOR.record_operation("heston_call", duration);
         result

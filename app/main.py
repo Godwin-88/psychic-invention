@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Optional
@@ -223,6 +223,7 @@ class OptionRequest(BaseModel):
     tau: float  # Time to expiration
     r: float  # Risk-free rate
     sigma: float  # Volatility
+    q: float = Field(0.0, description="Continuous dividend / borrow yield (annual, decimal)")
 
 class FFTRequest(BaseModel):
     s: float
@@ -241,6 +242,7 @@ class FFTOptimizedRequest(BaseModel):
     tau: float  # Time to expiration
     r: float  # Risk-free rate
     sigma: float  # Volatility
+    q: float = Field(0.0, description="Continuous dividend / borrow yield (annual, decimal)")
 
 class HestonRequest(BaseModel):
     s: float  # Current stock price
@@ -252,6 +254,7 @@ class HestonRequest(BaseModel):
     kappa: float  # Mean reversion speed
     sigma_v: float  # Volatility of volatility (xi)
     rho: float  # Correlation
+    q: float = Field(0.0, description="Continuous dividend / borrow yield (annual, decimal)")
 
 class GreeksRequest(BaseModel):
     s: float  # Current stock price
@@ -260,6 +263,7 @@ class GreeksRequest(BaseModel):
     r: float  # Risk-free rate
     sigma: float  # Volatility
     model: str  # "bs", "fft", or "numerical"
+    q: float = Field(0.0, description="Continuous dividend / borrow yield (annual, decimal)")
 
 class HestonGreeksRequest(BaseModel):
     s: float  # Current stock price
@@ -271,6 +275,7 @@ class HestonGreeksRequest(BaseModel):
     kappa: float  # Mean reversion speed
     sigma_v: float  # Volatility of volatility (xi)
     rho: float  # Correlation
+    q: float = Field(0.0, description="Continuous dividend / borrow yield (annual, decimal)")
 
 @app.get("/")
 def root():
@@ -299,7 +304,7 @@ async def price_call_bs(request: OptionRequest, http_request: Request):
         )
         
         # Calculate price
-        price = pricing_engine.price_call(request.s, request.k, request.tau, request.r, request.sigma)
+        price = pricing_engine.price_call(request.s, request.k, request.tau, request.r, request.sigma, request.q)
         
         # Validate result
         if not isinstance(price, (int, float)) or price < 0:
@@ -357,7 +362,7 @@ async def price_put_bs(request: OptionRequest, http_request: Request):
         )
         
         # Calculate price
-        price = pricing_engine.price_put(request.s, request.k, request.tau, request.r, request.sigma)
+        price = pricing_engine.price_put(request.s, request.k, request.tau, request.r, request.sigma, request.q)
         
         # Validate result
         if not isinstance(price, (int, float)) or price < 0:
@@ -422,7 +427,7 @@ def price_call_fft_optimized(request: FFTOptimizedRequest):
     """Enhanced FFT pricing with automatic parameter optimization"""
     try:
         price = pricing_engine.price_call_fft_optimized(
-            request.s, request.k, request.tau, request.r, request.sigma
+            request.s, request.k, request.tau, request.r, request.sigma, request.q
         )
         return {
             "price": price, 
@@ -437,7 +442,7 @@ def price_put_fft_optimized(request: FFTOptimizedRequest):
     """Enhanced FFT put pricing with automatic parameter optimization"""
     try:
         price = pricing_engine.price_put_fft_optimized(
-            request.s, request.k, request.tau, request.r, request.sigma
+            request.s, request.k, request.tau, request.r, request.sigma, request.q
         )
         return {
             "price": price, 
@@ -496,7 +501,7 @@ def price_call_heston(request: HestonRequest):
         
         price = pricing_engine.price_heston_call(
             request.s, request.k, request.v0, request.r, 
-            request.kappa, request.theta, request.sigma_v, request.rho, request.tau
+            request.kappa, request.theta, request.sigma_v, request.rho, request.tau, request.q
         )
         return {
             "price": price, 
@@ -523,7 +528,7 @@ def price_put_heston(request: HestonRequest):
         
         price = pricing_engine.price_heston_put(
             request.s, request.k, request.v0, request.r, 
-            request.kappa, request.theta, request.sigma_v, request.rho, request.tau
+            request.kappa, request.theta, request.sigma_v, request.rho, request.tau, request.q
         )
         return {
             "price": price, 
@@ -541,17 +546,17 @@ def calculate_call_greeks(request: GreeksRequest):
     try:
         if request.model.lower() == "bs":
             greeks = pricing_engine.calculate_bs_call_greeks(
-                request.s, request.k, request.tau, request.r, request.sigma
+                request.s, request.k, request.tau, request.r, request.sigma, request.q
             )
             method = "Analytical Black-Scholes"
         elif request.model.lower() == "fft":
             greeks = pricing_engine.calculate_fft_call_greeks(
-                request.s, request.k, request.tau, request.r, request.sigma
+                request.s, request.k, request.tau, request.r, request.sigma, request.q
             )
             method = "Numerical (FFT-based)"
         elif request.model.lower() == "numerical":
             greeks = pricing_engine.calculate_numerical_call_greeks(
-                request.s, request.k, request.tau, request.r, request.sigma
+                request.s, request.k, request.tau, request.r, request.sigma, request.q
             )
             method = "Numerical (Black-Scholes-based)"
         else:
@@ -581,17 +586,17 @@ def calculate_put_greeks(request: GreeksRequest):
     try:
         if request.model.lower() == "bs":
             greeks = pricing_engine.calculate_bs_put_greeks(
-                request.s, request.k, request.tau, request.r, request.sigma
+                request.s, request.k, request.tau, request.r, request.sigma, request.q
             )
             method = "Analytical Black-Scholes"
         elif request.model.lower() == "fft":
             greeks = pricing_engine.calculate_fft_put_greeks(
-                request.s, request.k, request.tau, request.r, request.sigma
+                request.s, request.k, request.tau, request.r, request.sigma, request.q
             )
             method = "Numerical (FFT-based)"
         elif request.model.lower() == "numerical":
             greeks = pricing_engine.calculate_numerical_put_greeks(
-                request.s, request.k, request.tau, request.r, request.sigma
+                request.s, request.k, request.tau, request.r, request.sigma, request.q
             )
             method = "Numerical (Black-Scholes-based)"
         else:
@@ -631,7 +636,7 @@ def calculate_heston_call_greeks(request: HestonGreeksRequest):
         
         greeks = pricing_engine.calculate_heston_call_greeks(
             request.s, request.k, request.tau, request.r, 
-            request.v0, request.theta, request.kappa, request.sigma_v, request.rho
+            request.v0, request.theta, request.kappa, request.sigma_v, request.rho, request.q
         )
         
         return {
@@ -666,7 +671,7 @@ def calculate_heston_put_greeks(request: HestonGreeksRequest):
         
         greeks = pricing_engine.calculate_heston_put_greeks(
             request.s, request.k, request.tau, request.r, 
-            request.v0, request.theta, request.kappa, request.sigma_v, request.rho
+            request.v0, request.theta, request.kappa, request.sigma_v, request.rho, request.q
         )
         
         return {
@@ -703,6 +708,71 @@ def validate_feller_condition(kappa: float, theta: float, sigma_v: float):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+# ===== AMERICAN & MONTE CARLO ENDPOINTS =====
+class AmericanRequest(BaseModel):
+    s: float = Field(..., gt=0, description="Spot price")
+    k: float = Field(..., gt=0, description="Strike price")
+    tau: float = Field(..., gt=0, description="Time to expiry in years")
+    r: float = Field(..., description="Risk-free rate (annual, decimal)")
+    sigma: float = Field(..., gt=0, description="Volatility (annual, decimal)")
+    q: float = Field(0.0, description="Continuous dividend yield")
+    option_type: str = Field("put", pattern="^(call|put)$")
+    steps: int = Field(501, ge=3, le=20001, description="Binomial steps")
+
+
+@app.post("/price/american")
+def price_american_option(request: AmericanRequest):
+    """American option via Richardson-extrapolated Leisen-Reimer binomial tree."""
+    try:
+        price, delta, gamma, premium = pricing_engine.price_american(
+            request.s, request.k, request.tau, request.r, request.sigma,
+            request.q, request.option_type == "call", request.steps,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {
+        "price": price,
+        "delta": delta,
+        "gamma": gamma,
+        "early_exercise_premium": premium,
+        "model": "American (Leisen-Reimer binomial, Richardson-extrapolated)",
+        "engine": ENGINE,
+    }
+
+
+class MonteCarloRequest(BaseModel):
+    s: float = Field(..., gt=0)
+    k: float = Field(..., gt=0)
+    tau: float = Field(..., gt=0)
+    r: float
+    sigma: float = Field(..., gt=0)
+    q: float = 0.0
+    option_type: str = Field("call", pattern="^(call|put)$")
+    sims: int = Field(200_000, ge=1_000, le=10_000_000)
+    seed: Optional[int] = Field(None, ge=0, description="Set for reproducible results")
+
+
+@app.post("/price/mc")
+def price_monte_carlo(request: MonteCarloRequest):
+    """European option by antithetic Monte Carlo, with standard error and 95% CI."""
+    try:
+        price, se, paths = pricing_engine.price_mc_with_error(
+            request.s, request.k, request.tau, request.r, request.sigma,
+            request.sims, request.option_type == "call", request.seed, request.q,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {
+        "price": price,
+        "std_error": se,
+        "ci95": [price - 1.96 * se, price + 1.96 * se],
+        "paths": paths,
+        "seed": request.seed,
+        "model": "Monte Carlo (GBM, antithetic)",
+        "engine": ENGINE,
+    }
+
+
 @app.get("/health")
 async def health_check():
     """Basic health check endpoint"""
@@ -736,16 +806,16 @@ def compare_pricing_models(request: OptionRequest):
         
         # Black-Scholes
         try:
-            bs_call = pricing_engine.price_call(request.s, request.k, request.tau, request.r, request.sigma)
-            bs_put = pricing_engine.price_put(request.s, request.k, request.tau, request.r, request.sigma)
+            bs_call = pricing_engine.price_call(request.s, request.k, request.tau, request.r, request.sigma, request.q)
+            bs_put = pricing_engine.price_put(request.s, request.k, request.tau, request.r, request.sigma, request.q)
             results["black_scholes"] = {"call": bs_call, "put": bs_put}
         except Exception as e:
             results["black_scholes"] = {"error": str(e)}
         
         # FFT Optimized
         try:
-            fft_call = pricing_engine.price_call_fft_optimized(request.s, request.k, request.tau, request.r, request.sigma)
-            fft_put = pricing_engine.price_put_fft_optimized(request.s, request.k, request.tau, request.r, request.sigma)
+            fft_call = pricing_engine.price_call_fft_optimized(request.s, request.k, request.tau, request.r, request.sigma, request.q)
+            fft_put = pricing_engine.price_put_fft_optimized(request.s, request.k, request.tau, request.r, request.sigma, request.q)
             results["fft_optimized"] = {"call": fft_call, "put": fft_put}
         except Exception as e:
             results["fft_optimized"] = {"error": str(e)}

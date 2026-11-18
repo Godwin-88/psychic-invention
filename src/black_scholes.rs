@@ -7,30 +7,23 @@ use rayon::prelude::*;
 const SQRT_2PI: f64 = 2.5066282746310005024;
 const INV_SQRT_2PI: f64 = 0.3989422804014326779;
 
-/// Optimized normal CDF approximation for hot path performance
-/// Uses Abramowitz and Stegun approximation for speed
+/// Standard normal CDF via the complementary error function.
+/// Accurate to ~1e-15 (the previous Abramowitz–Stegun polynomial had ~7.5e-8
+/// absolute error, too coarse for implied-vol inversion and far-OTM Greeks).
+#[inline]
+pub fn norm_cdf(x: f64) -> f64 {
+    0.5 * statrs::function::erf::erfc(-x / std::f64::consts::SQRT_2)
+}
+
+/// Standard normal PDF.
+#[inline]
+pub fn norm_pdf(x: f64) -> f64 {
+    INV_SQRT_2PI * (-0.5 * x * x).exp()
+}
+
 #[inline]
 fn fast_normal_cdf(x: f64) -> f64 {
-    if x < -8.0 {
-        return 0.0;
-    }
-    if x > 8.0 {
-        return 1.0;
-    }
-    
-    let sign = if x >= 0.0 { 1.0 } else { -1.0 };
-    let x_abs = x.abs();
-    
-    // Abramowitz and Stegun approximation
-    let t = 1.0 / (1.0 + 0.2316419 * x_abs);
-    let poly = t * (0.319381530 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
-    let pdf = INV_SQRT_2PI * (-0.5 * x_abs * x_abs).exp();
-    
-    if sign > 0.0 {
-        1.0 - pdf * poly
-    } else {
-        pdf * poly
-    }
+    norm_cdf(x)
 }
 
 /// Internal optimized Black-Scholes call pricing (no PyResult wrapper for hot path)
@@ -72,42 +65,55 @@ pub fn price_put_internal(
     call_price - s + k * discount
 }
 
+/// Shared input validation for the Python-facing pricers.
+pub fn validate_inputs(s: f64, k: f64, tau: f64, r: f64, sigma: f64, q: f64) -> PyResult<()> {
+    if !(s > 0.0 && k > 0.0 && tau > 0.0 && sigma > 0.0) {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "Spot, strike, time to expiry and volatility must be positive",
+        ));
+    }
+    if !r.is_finite() || !q.is_finite() || r.abs() > 1.0 || q.abs() > 1.0 {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "Rates r and q must be finite and within [-100%, 100%]",
+        ));
+    }
+    Ok(())
+}
+
 /// Compute the Black-Scholes price of a European call option.
+///
+/// `q` is a continuous dividend (or borrow / foreign-rate) yield. The price is
+/// Black–Scholes on the dividend-adjusted spot S·e^(−qτ) (Merton 1973).
 #[pyfunction]
+#[pyo3(signature = (s, k, tau, r, sigma, q=0.0))]
 pub fn price_call(
     s: f64,
     k: f64,
     tau: f64,
     r: f64,
-    sigma: f64
+    sigma: f64,
+    q: f64,
 ) -> PyResult<f64> {
-    // Input validation for safety
-    if s <= 0.0 || k <= 0.0 || tau <= 0.0 || sigma <= 0.0 {
-        return Err(pyo3::exceptions::PyValueError::new_err(
-            "All parameters must be positive"
-        ));
-    }
-    
-    Ok(price_call_internal(s, k, tau, r, sigma))
+    validate_inputs(s, k, tau, r, sigma, q)?;
+    Ok(price_call_internal(s * (-q * tau).exp(), k, tau, r, sigma))
 }
 
 /// Compute the Black-Scholes price of a European put option via put-call parity.
+///
+/// `q` is a continuous dividend (or borrow / foreign-rate) yield. The price is
+/// Black–Scholes on the dividend-adjusted spot S·e^(−qτ) (Merton 1973).
 #[pyfunction]
+#[pyo3(signature = (s, k, tau, r, sigma, q=0.0))]
 pub fn price_put(
     s: f64,
     k: f64,
     tau: f64,
     r: f64,
-    sigma: f64
+    sigma: f64,
+    q: f64,
 ) -> PyResult<f64> {
-    // Input validation for safety
-    if s <= 0.0 || k <= 0.0 || tau <= 0.0 || sigma <= 0.0 {
-        return Err(pyo3::exceptions::PyValueError::new_err(
-            "All parameters must be positive"
-        ));
-    }
-    
-    Ok(price_put_internal(s, k, tau, r, sigma))
+    validate_inputs(s, k, tau, r, sigma, q)?;
+    Ok(price_put_internal(s * (-q * tau).exp(), k, tau, r, sigma))
 }
 
 /// Batch pricing for multiple strikes with parallel processing
