@@ -66,7 +66,7 @@ function VaRBar({ value, max, color }: { value: number; max: number; color: stri
 
 export const VaRCalculatorPanel = () => {
   const {
-    returns, weights, labels, usingDemo,
+    returns, labels, usingDemo,
     alpha, setAlpha, horizonDays, setHorizonDays, portfolioValue, setPortfolioValue,
     varData, computeVar, loading, error,
   } = useRisk();

@@ -151,7 +151,7 @@ function MSTGraph({ nodes, mstEdges, allEdges, showAllEdges, showDistances }: Gr
 // ── Panel ─────────────────────────────────────────────────────────────────
 export const MSTGraphPanel = () => {
   const {
-    returns, labels, usingDemo,
+    returns, usingDemo,
     mstData, computeMst, loading, error,
   } = useRisk();
 

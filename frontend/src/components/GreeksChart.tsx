@@ -188,6 +188,8 @@ export const GreeksChart: React.FC<GreeksChartProps> = ({
         ref={canvasRef}
         width={width}
         height={height}
+        role="img"
+        aria-label={`${selectedGreek} versus spot price chart`}
         className="max-w-full h-auto"
       />
     </div>

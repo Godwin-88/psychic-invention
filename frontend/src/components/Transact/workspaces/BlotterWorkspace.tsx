@@ -21,17 +21,6 @@ interface SelectedPosition {
   unrealized_pnl_pct: number;
 }
 
-const PlaceholderPanel = ({ title, desc }: { title: string; desc: string }) => (
-  <div className="flex flex-col items-center justify-center h-80 gap-4 text-center">
-    <div className="w-16 h-16 rounded-2xl bg-slate-500/10 border border-slate-500/20 flex items-center justify-center text-3xl">📋</div>
-    <div>
-      <p className="text-lg font-bold text-white">{title}</p>
-      <p className="text-sm text-slate-500 mt-1 max-w-xs">{desc}</p>
-    </div>
-    <span className="px-3 py-1 rounded-full text-xs bg-slate-800 text-slate-400 border border-slate-700">Panel active</span>
-  </div>
-);
-
 const BASE = AGENTS_CONFIG.BASE_URL;
 
 export const BlotterWorkspace = () => {

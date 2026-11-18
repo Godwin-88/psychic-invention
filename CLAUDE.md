@@ -38,8 +38,10 @@ make dev
 python -m venv venv
 source venv/Scripts/activate      # Windows (Git Bash)
 # source venv/bin/activate         # Linux / macOS
-pip install -r requirements.txt
-cd frontend && npm install
+pip install -r requirements-dev.txt     # runtime + test/lint tools
+# pip install -r requirements.txt       # runtime only (what the Docker image installs)
+# pip install -r requirements-optional.txt   # OpenBB, QuantLib, arch, networkx…
+cd frontend && npm ci
 
 # Optional: install OpenBB for broader data sources (large install)
 pip install openbb
@@ -49,6 +51,7 @@ pip install openbb
 ```bash
 maturin develop               # dev build (fast, unoptimised)
 maturin develop --release     # release build (production performance)
+maturin build --release       # abi3 wheel (Python >= 3.10) → target/wheels/
 ```
 > If Rust is unavailable the server falls back to `pricing_engine_mock.py` automatically.
 
@@ -70,8 +73,8 @@ npm run preview   # preview production build
 
 ### Testing
 ```bash
-# Python (all)
-pytest app/tests/ -v
+# Python (all) — config in pyproject.toml; live-server load tests need RUN_INTEGRATION=1
+pytest
 pytest app/tests/ -v --cov=app --cov-report=term-missing
 
 # Python (property-based only)
@@ -79,10 +82,10 @@ pytest app/tests/test_mathematical_consistency_properties.py -v
 pytest app/tests/test_deriv_api_properties.py -v
 
 # Rust unit + integration
-cargo test
+cargo test --no-default-features   # pyo3 extension-module off so tests link
 
 # Rust property-based (proptest)
-cargo test --features proptest
+cargo test --no-default-features --features proptest
 
 # Performance benchmarks
 cargo bench
@@ -192,7 +195,7 @@ L3  Redis long-TTL      (1 hr,  OHLCV history, news)
 | `app/factors/fama_macbeth.py` | Fama-MacBeth two-stage regression |
 | `app/factors/smart_beta.py` | Quintile & signal-weighted smart beta |
 | `app/factors/crowding.py` | Factor crowding / herding index |
-| `app/vol/calibration.py` | Heston calibration & implied vol (BS Newton) |
+| `app/vol/calibration.py` | Heston calibration (vega-weighted least squares) & implied vol (Brent) |
 | `app/higher_moments.py` | Coskewness matrix |
 | `app/deriv_api_client.py` | Deriv API WebSocket client + L1/L2 cache |
 | `app/market_data_endpoints.py` | Market data FastAPI router |
@@ -226,6 +229,13 @@ DERIV_APP_ID=your_app_id
 
 MAX_CONCURRENT_REQUESTS=1000
 RATE_LIMIT_PER_SECOND=10
+
+# Runtime & security (see app/security.py)
+APP_ENV=development        # production: fail closed (no mock engine, keys required)
+WRITE_API_KEYS=            # comma-separated; POST /blotter/trade
+ADMIN_API_KEYS=            # cache flush, /agents/enrich, marketplace registrations
+CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+DATABASE_URL=              # Postgres blotter; required with >1 worker
 ```
 
 ### Frontend (`frontend/.env`)
@@ -233,6 +243,7 @@ RATE_LIMIT_PER_SECOND=10
 VITE_API_URL=http://localhost:8000
 VITE_ENV=development
 VITE_ENABLE_DEMO=true
+# VITE_API_KEY=            # sent as X-API-Key; trusted internal deployments only
 ```
 
 ---
@@ -242,7 +253,7 @@ VITE_ENABLE_DEMO=true
 1. **Import error for `pricing_engine`** — Rust library not built. Run `maturin develop` first.
 2. **cvxpy not installed** → MVO/Kelly endpoints return 503. `pip install cvxpy`.
 3. **Port 8000 in use** → Kill existing process: `lsof -ti:8000 | xargs kill -9`.
-4. **CORS errors in browser** — Backend CORS is set to `localhost:3000`. Frontend must run on port 3000.
+4. **CORS errors in browser** — Allowed origins come from `CORS_ORIGINS` (default `localhost:3000`). Add your frontend origin there.
 5. **Feller condition violated** → Heston endpoints return 400 if `2κθ ≤ σᵥ²`. Adjust parameters.
 6. **Redis connection refused** → Docker not running. Run `docker compose up -d redis` or use `--no-redis` flag.
 7. **`redis.asyncio` AttributeError** → `redis` package too old. `pip install "redis>=5.0"`.
@@ -254,7 +265,11 @@ VITE_ENABLE_DEMO=true
 
 ## Deployment
 
-- **Backend** → Render.com (`render.yaml`). Build: install Rust + pip + maturin. Start: gunicorn + uvicorn workers.
+- **Docker** → `docker build -t pricing-engine .` (multi-stage: Rust builder → slim non-root runtime, `HEALTHCHECK`, gunicorn). Set `APP_ENV=production`, `WRITE_API_KEYS`, `ADMIN_API_KEYS`, `CORS_ORIGINS`; set `DATABASE_URL` before `WEB_CONCURRENCY` > 1.
+- **Metrics** → `GET /metrics` (Prometheus: request count and latency by route).
+- **CI** → `.github/workflows/ci.yml`: Rust tests + clippy, wheel build + pytest (3.10, 3.12), pip-audit, frontend type-check/test/build, Docker build + smoke test.
+
+- **Backend** → Render.com (`render.yaml`). Build: `build.sh` (Rust toolchain → wheel → install). Start: gunicorn + uvicorn (1 worker until `DATABASE_URL` is set).
 - **Frontend** → Vercel (`vercel.json`). Static build: `npm run build` → `dist/`.
 
 ---

@@ -2,8 +2,9 @@
 Transact Phase 1 Routes — Portfolio, Risk, Optimizer, Blotter
 """
 
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
+from .security import require_admin, require_write
 from typing import Optional, List
 import numpy as np
 
@@ -23,7 +24,24 @@ from .blotter.db_blotter import (
     add_trade as db_add_trade,
     get_trades_from_db,
     get_positions_from_db,
+    load_store as db_load_store,
 )
+from .security import is_production
+
+
+def require_persistent_blotter() -> None:
+    """In production the blotter must be the Postgres ledger: the in-memory
+    store is per process, so with several workers each sees a different book."""
+    if is_production() and not use_db_blotter():
+        raise HTTPException(
+            status_code=503,
+            detail="Blotter requires DATABASE_URL (PostgreSQL) in production",
+        )
+
+
+def blotter_store():
+    """Postgres-backed snapshot when configured, else the in-memory store (dev)."""
+    return db_load_store() if use_db_blotter() else get_trade_store()
 from .scenarios.scenario_engine import apply_custom_scenario, probabilistic_scenario_optimization, CRISIS_PERIODS
 from .scenarios.monte_carlo import monte_carlo_portfolio
 from .scenarios.behavioral import portfolio_perceived_utility, herding_stress_var
@@ -32,7 +50,7 @@ from .factors.fama_macbeth import fama_macbeth
 from .factors.smart_beta import smart_beta_sort, smart_beta_signal_weighted
 from .factors.crowding import crowding_index
 from .higher_moments import compute_coskewness
-from .vol.calibration import heston_calibrate, implied_vol_bs
+from .vol.calibration import ImpliedVolError, heston_calibrate, implied_vol_bs
 from .risk.covariance import compute_covariance_health, compute_mst
 
 try:
@@ -79,7 +97,7 @@ def marketplace_register(req: MarketplaceRegistrationRequest):
     return {"status": "ok", "message": f"Registration received for {req.menu_id}.", "count": len(_registrations)}
 
 
-@router.get("/marketplace/registrations")
+@router.get("/marketplace/registrations", dependencies=[Depends(require_admin)])
 def marketplace_registrations():
     """Return all registrations (admin view)."""
     return {"registrations": _registrations, "count": len(_registrations)}
@@ -439,6 +457,7 @@ class KellyMultiRequest(BaseModel):
     returns: List[List[float]]  # T×N
     fractional: float = 1.0
     long_only: bool = True
+    max_leverage: float = 1.0  # cap on gross exposure; remainder held in cash
 
 
 @router.post("/optimize/blm")
@@ -526,9 +545,12 @@ def post_optimize_kelly(req: KellyMultiRequest):
             returns,
             fractional=req.fractional,
             long_only=req.long_only,
+            max_leverage=req.max_leverage,
         )
         return {
+            "model": "kelly_multi_asset",
             "weights": res.weights.tolist(),
+            "cash_weight": float(1.0 - res.weights.sum()),
             "expected_growth": res.expected_growth,
             "optimal_fraction": res.optimal_fraction,
             "fractional_kelly": res.fractional_kelly,
@@ -560,7 +582,9 @@ class HestonCalibrateRequest(BaseModel):
     r: float
     strikes: List[float]
     expiries: List[float]
-    market_prices: List[float]
+    market_prices: List[float]  # European call prices
+    q: float = 0.0
+    enforce_feller: bool = False
 
 
 class SmartBetaRequest(BaseModel):
@@ -665,15 +689,22 @@ def post_heston_calibrate(req: HestonCalibrateRequest):
         res = heston_calibrate(
             req.s, req.r,
             np.array(req.strikes), np.array(req.expiries), np.array(req.market_prices),
+            q=req.q, enforce_feller=req.enforce_feller,
         )
         return {
+            "model": "heston_calibration",
             "v0": float(res.v0),
             "kappa": float(res.kappa),
             "theta": float(res.theta),
             "xi": float(res.xi),
             "rho": float(res.rho),
             "rmse": float(res.rmse),
+            "iv_rmse_vol_points": res.iv_rmse,
             "feller_condition_ok": bool(res.feller_ok),
+            "converged": res.success,
+            "message": res.message,
+            "n_options": res.n_options,
+            "residuals": res.residuals,
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -685,17 +716,25 @@ class ImpliedSurfaceRequest(BaseModel):
     strikes: List[float]
     expiries: List[float]
     market_prices: List[float]
+    q: float = 0.0
+    option_type: str = "call"
 
 
 @router.post("/vol/implied-surface")
 def post_vol_implied_surface(req: ImpliedSurfaceRequest):
     """Compute IV for each (K,tau) from market prices (calls)."""
     try:
+        if not len(req.strikes) == len(req.expiries) == len(req.market_prices):
+            raise ValueError("strikes, expiries and market_prices must have equal length")
         ivs = []
-        for i in range(len(req.strikes)):
-            iv = implied_vol_bs(req.market_prices[i], req.s, req.strikes[i], req.r, req.expiries[i], "call")
-            ivs.append({"strike": float(req.strikes[i]), "expiry": float(req.expiries[i]), "iv": float(iv)})
-        return {"surface": ivs}
+        for k, t, p in zip(req.strikes, req.expiries, req.market_prices):
+            point = {"strike": float(k), "expiry": float(t), "iv": None, "error": None}
+            try:
+                point["iv"] = implied_vol_bs(p, req.s, k, req.r, t, req.option_type, req.q)
+            except ImpliedVolError as e:
+                point["error"] = str(e)
+            ivs.append(point)
+        return {"model": "black_scholes_implied_vol", "surface": ivs}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -723,17 +762,15 @@ def post_vol_heston_surface(req: HestonSurfaceRequest):
             row = []
             for m in moneyness:
                 k = m * req.s
-                price = 0.0
-                if HAS_PRICING:
-                    try:
-                        price = float(pricing_engine.price_heston_call(
-                            req.s, k, req.v0, req.r,
-                            req.kappa, req.theta, req.xi, req.rho, tau
-                        ))
-                    except Exception:
-                        price = 0.0
-                iv = implied_vol_bs(price, req.s, k, req.r, tau, "call") if price > 1e-6 else float(np.sqrt(req.v0))
-                row.append(round(iv, 5))
+                # Feller is not required for pricing; it is reported below.
+                price = float(pricing_engine.price_heston_call(
+                    req.s, k, req.v0, req.r,
+                    req.kappa, req.theta, req.xi, req.rho, float(tau), 0.0, False,
+                ))
+                try:
+                    row.append(round(implied_vol_bs(price, req.s, k, req.r, float(tau), "call"), 5))
+                except ImpliedVolError:
+                    row.append(None)  # price at intrinsic: IV not identifiable
             iv_grid.append(row)
         # smile at mid expiry
         mid = req.n_expiry // 2
@@ -949,11 +986,13 @@ def get_blotter_instruments(asset_type: Optional[str] = "equity"):
 
 # --- Blotter: Trade Entry, Positions, History ---
 class TradeEntryRequest(BaseModel):
-    asset: str
-    direction: str  # "long" | "short"
-    quantity: float
-    entry_price: float
-    entry_date: Optional[str] = None
+    asset: str = Field(..., min_length=1, max_length=64)
+    direction: str = Field(..., description='"long" = buy, "short" = sell')
+    quantity: float = Field(..., gt=0, description="Units (positive; side via direction)")
+    entry_price: float = Field(..., gt=0)
+    entry_date: Optional[str] = Field(None, pattern=r"^\d{4}-\d{2}-\d{2}$")
+    fees: float = Field(0.0, ge=0, description="Total commission for the fill")
+    multiplier: float = Field(1.0, gt=0, description="Contract multiplier (100 for US equity options)")
     model_used: Optional[str] = None
     theoretical_price: Optional[float] = None
     strategy_tag: Optional[str] = None
@@ -964,7 +1003,7 @@ class PositionsRequest(BaseModel):
     current_prices: dict  # {"AAPL": 150.0, ...}
 
 
-@router.post("/blotter/trade")
+@router.post("/blotter/trade", dependencies=[Depends(require_write), Depends(require_persistent_blotter)])
 def post_blotter_trade(req: TradeEntryRequest):
     """Add a new trade. Persists to Postgres + double-entry ledger when DATABASE_URL is set."""
     try:
@@ -995,6 +1034,8 @@ def post_blotter_trade(req: TradeEntryRequest):
             theoretical_price=req.theoretical_price,
             strategy_tag=req.strategy_tag,
             asset_class=req.asset_class,
+            fees=req.fees,
+            multiplier=req.multiplier,
         )
         return {
             "id": trade.id,
@@ -1003,6 +1044,8 @@ def post_blotter_trade(req: TradeEntryRequest):
             "quantity": trade.quantity,
             "entry_price": trade.entry_price,
             "entry_date": trade.entry_date,
+            "fees": trade.fees,
+            "multiplier": trade.multiplier,
         }
     except HTTPException:
         raise
@@ -1010,7 +1053,7 @@ def post_blotter_trade(req: TradeEntryRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/blotter/positions")
+@router.get("/blotter/positions", dependencies=[Depends(require_persistent_blotter)])
 def get_blotter_positions(current_prices: Optional[str] = None):
     """Get open positions with P&L. Uses DB when DATABASE_URL is set."""
     try:
@@ -1022,25 +1065,12 @@ def get_blotter_positions(current_prices: Optional[str] = None):
             return {"positions": positions}
         store = get_trade_store()
         positions = store.get_positions(prices_dict)
-        return {
-            "positions": [
-                {
-                    "asset": p.asset,
-                    "quantity": p.quantity,
-                    "direction": p.direction,
-                    "entry_price": p.entry_price,
-                    "current_price": p.current_price,
-                    "unrealized_pnl": p.unrealized_pnl,
-                    "unrealized_pnl_pct": p.unrealized_pnl_pct,
-                }
-                for p in positions
-            ]
-        }
+        return {"positions": [p.to_dict() for p in positions]}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/blotter/positions")
+@router.post("/blotter/positions", dependencies=[Depends(require_persistent_blotter)])
 def post_blotter_positions(req: PositionsRequest):
     """Get positions with P&L given current prices. Uses DB when DATABASE_URL is set."""
     try:
@@ -1049,20 +1079,7 @@ def post_blotter_positions(req: PositionsRequest):
             return {"positions": positions}
         store = get_trade_store()
         positions = store.get_positions(req.current_prices)
-        return {
-            "positions": [
-                {
-                    "asset": p.asset,
-                    "quantity": p.quantity,
-                    "direction": p.direction,
-                    "entry_price": p.entry_price,
-                    "current_price": p.current_price,
-                    "unrealized_pnl": p.unrealized_pnl,
-                    "unrealized_pnl_pct": p.unrealized_pnl_pct,
-                }
-                for p in positions
-            ]
-        }
+        return {"positions": [p.to_dict() for p in positions]}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -1091,7 +1108,7 @@ def get_blotter_accounts(as_of_date: Optional[str] = None):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/blotter/history")
+@router.get("/blotter/history", dependencies=[Depends(require_persistent_blotter)])
 def get_blotter_history(
     asset: Optional[str] = None,
     from_date: Optional[str] = None,
@@ -1273,7 +1290,7 @@ def post_scenarios_behavioral(req: BehavioralRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/blotter/context")
+@router.get("/blotter/context", dependencies=[Depends(require_persistent_blotter)])
 def get_blotter_context():
     """
     Aggregated blotter context for the AI agent.
@@ -1281,7 +1298,7 @@ def get_blotter_context():
     and attribution metadata in a single lightweight payload.
     """
     try:
-        store = get_trade_store()
+        store = blotter_store()
         positions_raw = store.get_positions({})
         trades_raw = store.get_history() if hasattr(store, 'get_history') else []
 
@@ -1361,28 +1378,23 @@ def post_blotter_attribution(req: AttributionRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/blotter/pnl")
+@router.post("/blotter/pnl", dependencies=[Depends(require_persistent_blotter)])
 def post_blotter_pnl(req: PnLRequest):
     """Cumulative P&L time series or current snapshot (Menu 8)."""
     try:
-        store = get_trade_store()
+        store = blotter_store()
         if req.price_history:
             series = store.get_pnl_timeseries(
                 req.price_history, req.from_date, req.to_date
             )
             return {"timeseries": series}
         if req.current_prices:
-            cum = store.get_cumulative_pnl(req.current_prices)
-            positions = store.get_positions(req.current_prices)
+            summary = store.get_pnl_summary(req.current_prices)
+            positions = store.get_positions(req.current_prices, include_flat=True)
             return {
-                "cumulative_pnl": cum,
-                "positions": [
-                    {
-                        "asset": p.asset,
-                        "unrealized_pnl": p.unrealized_pnl,
-                    }
-                    for p in positions
-                ],
+                "cumulative_pnl": summary["net_pnl"],
+                **summary,
+                "positions": [p.to_dict() for p in positions],
             }
         raise HTTPException(status_code=400, detail="Provide price_history or current_prices")
     except HTTPException:

@@ -16,8 +16,8 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from deriv_api_client import DerivAPIClient, MarketData, AssetClass
-from market_data_endpoints import get_deriv_client
+from app.deriv_api_client import DerivAPIClient, MarketData, AssetClass
+from app.market_data_endpoints import get_deriv_client
 
 
 class TestDerivAPIIntegration:
@@ -181,7 +181,7 @@ class TestMarketDataEndpoints:
     def test_endpoint_availability(self):
         """Test that market data endpoints are available"""
         # This test verifies that the endpoints can be imported
-        from market_data_endpoints import router
+        from app.market_data_endpoints import router
         
         # Check that router has the expected endpoints
         routes = [route.path for route in router.routes]
@@ -216,3 +216,28 @@ class TestMarketDataEndpoints:
 if __name__ == "__main__":
     # Run the tests
     pytest.main([__file__, "-v"])
+
+def test_deriv_client_is_not_reused_across_event_loops(monkeypatch):
+    """A client created on one event loop must not be handed out on another
+    (its pooled connections belong to the first, possibly closed, loop)."""
+    import asyncio
+
+    import app.market_data_endpoints as mde
+
+    monkeypatch.setattr(mde, "_deriv_client", None)
+    monkeypatch.setattr(mde, "_deriv_client_loop", None)
+    monkeypatch.setenv("DERIV_API_KEY", "k-test")
+    monkeypatch.setenv("DERIV_APP_ID", "app-test")
+
+    first = asyncio.run(mde.get_deriv_client())  # this loop closes afterwards
+
+    async def second_loop():
+        client = await mde.get_deriv_client()
+        same = client is await mde.get_deriv_client()
+        await mde.cleanup_deriv_client()  # must not raise "Event loop is closed"
+        return client, same
+
+    second, same_within_loop = asyncio.run(second_loop())
+    assert second is not first
+    assert same_within_loop
+    assert second.api_key == "k-test" and second.app_id == "app-test"

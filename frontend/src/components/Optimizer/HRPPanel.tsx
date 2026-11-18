@@ -109,7 +109,7 @@ function SortedHeatmap({
   const S = 280; const cellSize = (S - 20) / N;
 
   // Compute correlation from covariance
-  const std = cov.map((row, i) => Math.sqrt(cov[i][i]) || 1);
+  const std = cov.map((_row, i) => Math.sqrt(cov[i][i]) || 1);
   const corr = (i: number, j: number) => cov[i][j] / (std[i] * std[j]);
 
   // colour: blue negative → white zero → red positive

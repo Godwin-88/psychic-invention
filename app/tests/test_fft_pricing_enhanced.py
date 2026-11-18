@@ -96,8 +96,8 @@ class TestFFTEnhancedPricing:
         original_puts = pricing_engine.price_put_fft(s, k_min, delta_v, delta_k, n, tau, r, sigma, alpha)
         
         # Enhanced FFT with same parameters
-        enhanced_call = pricing_engine.price_call_fft_enhanced(s, k_min, delta_v, delta_k, n, tau, r, sigma, alpha)
-        enhanced_put = pricing_engine.price_put_fft_enhanced(s, k_min, delta_v, delta_k, n, tau, r, sigma, alpha)
+        enhanced_call = pricing_engine.price_call_fft_enhanced(s, 100.0, k_min, delta_v, delta_k, n, tau, r, sigma, alpha)
+        enhanced_put = pricing_engine.price_put_fft_enhanced(s, 100.0, k_min, delta_v, delta_k, n, tau, r, sigma, alpha)
         
         # Find the ATM index
         target_k = math.log(100.0)

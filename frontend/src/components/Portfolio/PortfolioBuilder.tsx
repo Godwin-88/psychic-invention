@@ -2,7 +2,7 @@
  * Asset Universe & Weight Builder — Menu 2.1 (TRANSACT_APP_SPEC §3.2.1)
  * Central hub: define assets, set weights, fetch real market data, compute analytics.
  */
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { usePortfolio } from '@/context/PortfolioContext';
 import { useSelectedAssets } from '@/context/SelectedAssetsContext';
 import { AssetSearchBar } from '@/components/AssetSearchBar';

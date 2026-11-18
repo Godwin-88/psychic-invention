@@ -14,7 +14,7 @@
  * Greeks: client-side BS (Δ, Γ, Θ, ν, ρ) — no extra request needed
  */
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import { MathBlock, MathInline } from '@/components/ui/Math';
+import { MathBlock } from '@/components/ui/Math';
 import { useAgentContext, DEFAULT_SUGGESTED_QUESTIONS } from '@/context/AgentContext';
 import {
   priceCallBS, pricePutBS,
@@ -79,8 +79,8 @@ export const PricingWorkspace = ({ defaultTab: _tab = 'bs' }: { defaultTab?: str
     setError(null);
     try {
       const [quote, opts] = await Promise.all([
-        getAssetQuote(sym),
-        getAssetOptions(sym, 2, 0.20).catch(() => null),
+        getAssetQuote(sym, dataProvider),
+        getAssetOptions(sym, 2, 0.20, dataProvider).catch(() => null),
       ]);
       setQuoteInfo({ spot: quote.spot, name: quote.name });
       const spot = quote.spot;
@@ -332,7 +332,6 @@ export const PricingWorkspace = ({ defaultTab: _tab = 'bs' }: { defaultTab?: str
       {results && (
         <div className={`grid gap-4 ${results.length === 3 ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
           {results.map(m => {
-            const price = optType === 'call' ? m.call : m.put;
             const other = optType === 'call' ? m.put  : m.call;
             const parity = params.s - params.k * Math.exp(-params.r * params.tau);
             return (

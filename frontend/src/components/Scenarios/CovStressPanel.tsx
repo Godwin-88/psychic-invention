@@ -129,7 +129,7 @@ export const CovStressPanel = () => {
   const [rfRate, setRfRate] = useState(0.05);  // annualised risk-free for Sharpe
 
   // ── Compute baseline from live data ────────────────────────────────────────
-  const { baseCorr, baseSig, baseCov, portVol, portReturn } = useMemo(() => {
+  const { baseCorr, baseSig, portVol, portReturn } = useMemo(() => {
     if (!hasData || !N) return { baseCorr: [], baseSig: [], baseCov: [], portVol: 0, portReturn: 0 };
     const T = returnMatrix.length;
     const w = weights.length === N ? weights : Array(N).fill(1 / N);
@@ -189,7 +189,6 @@ export const CovStressPanel = () => {
   }, [baseCorr, baseSig, corrShift, volMultiplier, weights, N, hasData]);
 
   // Sharpe ratios (annualised ×√252, daily rf / 252)
-  const rfDaily = rfRate / 252;
   const baseAnnVol     = portVol * Math.sqrt(252);
   const stressedAnnVol = stressedPortVol * Math.sqrt(252);
   const annReturn      = portReturn * 252;

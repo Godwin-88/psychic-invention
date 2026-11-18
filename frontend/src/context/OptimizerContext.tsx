@@ -11,9 +11,9 @@ import {
   createContext, useContext, useState, useCallback, useMemo, type ReactNode,
 } from 'react';
 import {
-  postOptimizeMvoFrontier, postOptimizeMvo, postOptimizeBlm,
+  postOptimizeMvoFrontier, postOptimizeBlm,
   postOptimizeRiskParity, postOptimizeHrp,
-  postOptimizeKelly, postOptimizeKellySingle,
+  postOptimizeKelly, 
   getAssetHistory,
 } from '@/utils/api';
 import { useDataProvider } from '@/context/DataProviderContext';

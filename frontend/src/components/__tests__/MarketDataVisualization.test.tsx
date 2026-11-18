@@ -3,7 +3,7 @@ import { MarketDataVisualization } from '../MarketDataVisualization';
 import type { VolatilitySurfaceData, GreeksVisualizationData, OptionChainData } from '@/types';
 
 // Mock the chart components
-jest.mock('../VolatilitySurfaceChart', () => ({
+vi.mock('../VolatilitySurfaceChart', () => ({
   VolatilitySurfaceChart: ({ data }: { data: VolatilitySurfaceData }) => (
     <div data-testid="volatility-surface-chart">
       Volatility Surface Chart - {data.strikes.length} strikes
@@ -11,7 +11,7 @@ jest.mock('../VolatilitySurfaceChart', () => ({
   )
 }));
 
-jest.mock('../GreeksChart', () => ({
+vi.mock('../GreeksChart', () => ({
   GreeksChart: ({ data, selectedGreek }: { data: GreeksVisualizationData, selectedGreek: string }) => (
     <div data-testid="greeks-chart">
       Greeks Chart - {selectedGreek} - {data.spotPrices.length} points
@@ -19,7 +19,7 @@ jest.mock('../GreeksChart', () => ({
   )
 }));
 
-jest.mock('../OptionChainDisplay', () => ({
+vi.mock('../OptionChainDisplay', () => ({
   OptionChainDisplay: ({ data }: { data: OptionChainData[] }) => (
     <div data-testid="option-chain-display">
       Option Chain - {data.length} options
@@ -161,7 +161,8 @@ describe('MarketDataVisualization', () => {
     );
     
     // Should default to Greeks tab since it's the only available data
-    expect(screen.getByText('Greeks Analysis')).toBeInTheDocument();
+    // (the label appears on the tab button and as the section heading)
+    expect(screen.getByRole('heading', { name: 'Greeks Analysis' })).toBeInTheDocument();
     expect(screen.getByText('Option sensitivities across different spot prices')).toBeInTheDocument();
     
     // Should have Greek selector
@@ -195,12 +196,13 @@ describe('MarketDataVisualization', () => {
       />
     );
     
-    // Should show summary cards for all Greeks
-    expect(screen.getByText('Delta (Δ)')).toBeInTheDocument();
-    expect(screen.getByText('Gamma (Γ)')).toBeInTheDocument();
-    expect(screen.getByText('Theta (Θ)')).toBeInTheDocument();
-    expect(screen.getByText('Vega (ν)')).toBeInTheDocument();
-    expect(screen.getByText('Rho (ρ)')).toBeInTheDocument();
+    // Should show summary cards for all Greeks ("Delta (Δ)" is also the
+    // selector's default option)
+    expect(screen.getAllByText('Delta (Δ)').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText('Gamma (Γ)').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText('Theta (Θ)').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText('Vega (ν)').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText('Rho (ρ)').length).toBeGreaterThanOrEqual(2);
   });
 
   it('renders option chain content correctly', () => {
@@ -211,7 +213,7 @@ describe('MarketDataVisualization', () => {
       />
     );
     
-    expect(screen.getByText('Option Chain')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Option Chain' })).toBeInTheDocument();
     expect(screen.getByText('Complete option chain with prices, implied volatilities, and Greeks')).toBeInTheDocument();
     expect(screen.getByTestId('option-chain-display')).toBeInTheDocument();
   });

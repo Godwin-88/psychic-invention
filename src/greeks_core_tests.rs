@@ -43,7 +43,7 @@ mod greeks_core_property_tests {
     }
 
     fn numerical_delta(s: f64, k: f64, tau: f64, r: f64, sigma: f64, is_call: bool) -> f64 {
-        let ds = s * 0.01;
+        let ds = s * 1e-4; // small bump: exact CDF keeps round-off negligible
         let price_up = if is_call {
             bs_call_price(s + ds, k, tau, r, sigma)
         } else {
@@ -58,7 +58,7 @@ mod greeks_core_property_tests {
     }
 
     fn numerical_gamma(s: f64, k: f64, tau: f64, r: f64, sigma: f64, is_call: bool) -> f64 {
-        let ds = s * 0.01;
+        let ds = s * 1e-4; // small bump: exact CDF keeps round-off negligible
         let price_base = if is_call {
             bs_call_price(s, k, tau, r, sigma)
         } else {

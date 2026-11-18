@@ -2,6 +2,7 @@ use pyo3::prelude::*;
 
 pub mod black_scholes;
 pub mod monte_carlo;
+pub mod american;
 pub mod fft_pricing;
 pub mod fft_pricing_enhanced;
 pub mod heston;
@@ -31,6 +32,10 @@ pub fn pricing_engine(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Phase 2 - Monte Carlo
     m.add_function(wrap_pyfunction!(monte_carlo::price_call_mc, m)?)?;
     m.add_function(wrap_pyfunction!(monte_carlo::price_put_mc, m)?)?;
+    m.add_function(wrap_pyfunction!(monte_carlo::price_mc_with_error, m)?)?;
+
+    // American options (Leisen-Reimer binomial)
+    m.add_function(wrap_pyfunction!(american::price_american_py, m)?)?;
     
     // Phase 3 - FFT Pricing (Original)
     m.add_function(wrap_pyfunction!(fft_pricing::price_call_fft, m)?)?;
@@ -46,6 +51,7 @@ pub fn pricing_engine(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(heston::cf_heston, m)?)?;
     m.add_function(wrap_pyfunction!(heston::price_heston_call, m)?)?;
     m.add_function(wrap_pyfunction!(heston::price_heston_put, m)?)?;
+    m.add_function(wrap_pyfunction!(heston::price_heston_calls_batch, m)?)?;
     m.add_function(wrap_pyfunction!(heston::validate_feller_condition_py, m)?)?;
     
     // Phase 5 - Greeks Calculator (Optimized)

@@ -87,7 +87,7 @@ function RadarChart({
 
 // ── Weight heatmap row ────────────────────────────────────────────────────────
 function WeightRow({
-  label, values, strategies,
+  label, values,
 }: { label: string; values: (number | null)[]; strategies: string[] }) {
   const max = Math.max(...values.filter((v): v is number => v !== null), 0.001);
   const COLORS = ['#6366f1','#f59e0b','#10b981','#ec4899','#06b6d4'];
@@ -205,7 +205,7 @@ export const ComparisonPanel = () => {
 
       {/* Status row */}
       <div className="flex flex-wrap gap-2">
-        {strategies.map((s, si) => (
+        {strategies.map((s, _si) => (
           <span key={s.key} className={`px-2.5 py-1 rounded-full text-xs border ${
             s.weights
               ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'

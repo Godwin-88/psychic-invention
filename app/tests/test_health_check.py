@@ -17,7 +17,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from health_check import (
+from app.health_check import (
     HealthStatus, HealthCheckResult, SystemHealthReport, HealthChecker,
     health_checker, check_pricing_engine_basic, check_pricing_models,
     check_greeks_calculation, check_market_data_api, check_system_resources,
@@ -303,10 +303,10 @@ class TestHealthChecker:
 class TestBuiltInHealthChecks:
     """Test built-in health check functions"""
     
-    @patch('health_check.PRICING_ENGINE_AVAILABLE', True)
+    @patch('app.health_check.PRICING_ENGINE_AVAILABLE', True)
     def test_check_pricing_engine_basic_success(self):
         """Test basic pricing engine health check success"""
-        with patch('health_check.pricing_engine') as mock_pricing_engine:
+        with patch('app.health_check.pricing_engine') as mock_pricing_engine:
             mock_pricing_engine.price_call.return_value = 10.5
             
             result = check_pricing_engine_basic()
@@ -316,7 +316,7 @@ class TestBuiltInHealthChecks:
             assert "working" in result.message
             assert result.details["test_price"] == 10.5
     
-    @patch('health_check.PRICING_ENGINE_AVAILABLE', False)
+    @patch('app.health_check.PRICING_ENGINE_AVAILABLE', False)
     def test_check_pricing_engine_basic_unavailable(self):
         """Test basic pricing engine health check when unavailable"""
         result = check_pricing_engine_basic()
@@ -325,10 +325,10 @@ class TestBuiltInHealthChecks:
         assert result.status == HealthStatus.UNHEALTHY
         assert "not available" in result.message
     
-    @patch('health_check.PRICING_ENGINE_AVAILABLE', True)
+    @patch('app.health_check.PRICING_ENGINE_AVAILABLE', True)
     def test_check_pricing_engine_basic_failure(self):
         """Test basic pricing engine health check failure"""
-        with patch('health_check.pricing_engine') as mock_pricing_engine:
+        with patch('app.health_check.pricing_engine') as mock_pricing_engine:
             mock_pricing_engine.price_call.side_effect = Exception("Calculation failed")
             
             result = check_pricing_engine_basic()
@@ -338,10 +338,10 @@ class TestBuiltInHealthChecks:
             assert "failed" in result.message
             assert "Calculation failed" in result.message
     
-    @patch('health_check.PRICING_ENGINE_AVAILABLE', True)
+    @patch('app.health_check.PRICING_ENGINE_AVAILABLE', True)
     def test_check_pricing_models_all_working(self):
         """Test pricing models check when all models work"""
-        with patch('health_check.pricing_engine') as mock_pricing_engine:
+        with patch('app.health_check.pricing_engine') as mock_pricing_engine:
             # Mock all pricing functions to return valid prices
             mock_pricing_engine.price_call.return_value = 10.0
             mock_pricing_engine.price_put.return_value = 5.0
@@ -358,10 +358,10 @@ class TestBuiltInHealthChecks:
             assert result.details["working_models"] == 3
             assert len(result.details["failed_models"]) == 0
     
-    @patch('health_check.PRICING_ENGINE_AVAILABLE', True)
+    @patch('app.health_check.PRICING_ENGINE_AVAILABLE', True)
     def test_check_pricing_models_partial_failure(self):
         """Test pricing models check with partial failures"""
-        with patch('health_check.pricing_engine') as mock_pricing_engine:
+        with patch('app.health_check.pricing_engine') as mock_pricing_engine:
             # Mock Black-Scholes to work
             mock_pricing_engine.price_call.return_value = 10.0
             mock_pricing_engine.price_put.return_value = 5.0
@@ -382,10 +382,10 @@ class TestBuiltInHealthChecks:
             assert result.details["working_models"] == 2
             assert len(result.details["failed_models"]) == 1
     
-    @patch('health_check.PRICING_ENGINE_AVAILABLE', True)
+    @patch('app.health_check.PRICING_ENGINE_AVAILABLE', True)
     def test_check_greeks_calculation_success(self):
         """Test Greeks calculation health check success"""
-        with patch('health_check.pricing_engine') as mock_pricing_engine:
+        with patch('app.health_check.pricing_engine') as mock_pricing_engine:
             # Mock Greeks objects
             mock_greeks = Mock()
             mock_greeks.delta = 0.5
@@ -455,49 +455,49 @@ class TestBuiltInHealthChecks:
         assert result.status == HealthStatus.DEGRADED
         assert "high" in result.message.lower()
     
+    @staticmethod
+    def _fake_client(connected=True, data_error=None):
+        client = MagicMock()
+        client.__aenter__ = AsyncMock(return_value=client)
+        client.__aexit__ = AsyncMock(return_value=False)
+        client.validate_connection = AsyncMock(return_value=connected)
+        if data_error:
+            client.get_market_data = AsyncMock(side_effect=data_error)
+        else:
+            client.get_market_data = AsyncMock(return_value=MagicMock(symbol="AAPL"))
+        client.get_cache_stats = MagicMock(return_value={"l1_cache_size": 10})
+        return client
+
     @pytest.mark.asyncio
     async def test_check_market_data_api_success(self):
-        """Test market data API health check success"""
-        # Mock the entire check function to avoid complex async context manager mocking
-        mock_result = HealthCheckResult(
-            name="market_data_api",
-            status=HealthStatus.HEALTHY,
-            message="Market data API working correctly",
-            details={
-                "connection_test": True,
-                "data_retrieval": True,
-                "sample_symbol": "AAPL",
-                "cache_stats": {"l1_cache_size": 10}
-            }
-        )
-        
-        with patch('health_check.check_market_data_api', return_value=mock_result):
+        """Market data health check reports healthy when the client works."""
+        client = self._fake_client()
+        with patch("app.deriv_api_client.create_test_client", AsyncMock(return_value=client)):
             result = await check_market_data_api()
-            
-            assert result.name == "market_data_api"
-            assert result.status == HealthStatus.HEALTHY
-            assert "working correctly" in result.message
-            assert result.details["connection_test"] is True
-            assert result.details["data_retrieval"] is True
-    
+        assert result.name == "market_data_api"
+        assert result.status == HealthStatus.HEALTHY
+        assert "working correctly" in result.message
+        assert result.details["connection_test"] is True
+        assert result.details["data_retrieval"] is True
+        assert result.details["sample_symbol"] == "AAPL"
+
     @pytest.mark.asyncio
     async def test_check_market_data_api_connection_failure(self):
-        """Test market data API health check connection failure"""
-        # Mock the entire check function to avoid complex async context manager mocking
-        mock_result = HealthCheckResult(
-            name="market_data_api",
-            status=HealthStatus.DEGRADED,
-            message="Market data API connection failed",
-            details={"connection_test": False}
-        )
-        
-        with patch('health_check.check_market_data_api', return_value=mock_result):
+        """Market data health check reports degraded when the connection fails."""
+        client = self._fake_client(connected=False)
+        with patch("app.deriv_api_client.create_test_client", AsyncMock(return_value=client)):
             result = await check_market_data_api()
-            
-            assert result.name == "market_data_api"
-            assert result.status == HealthStatus.DEGRADED
-            assert "connection failed" in result.message
-            assert result.details["connection_test"] is False
+        assert result.status == HealthStatus.DEGRADED
+        assert "connection failed" in result.message
+        assert result.details["connection_test"] is False
+
+    @pytest.mark.asyncio
+    async def test_check_market_data_api_retrieval_failure(self):
+        client = self._fake_client(data_error=RuntimeError("boom"))
+        with patch("app.deriv_api_client.create_test_client", AsyncMock(return_value=client)):
+            result = await check_market_data_api()
+        assert result.status == HealthStatus.DEGRADED
+        assert result.details["data_retrieval"] is False
 
 
 class TestHealthCheckIntegration:

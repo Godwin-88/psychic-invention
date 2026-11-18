@@ -22,15 +22,17 @@ mod fft_property_tests {
             prop_assume!((s/k).ln().abs() < 1.0); // Avoid extreme moneyness
             
             // Calculate Black-Scholes benchmark
-            let bs_call = price_call(s, k, tau, r, sigma).unwrap();
+            let bs_call = price_call(s, k, tau, r, sigma, 0.0).unwrap();
             
             // Calculate FFT price with optimized parameters
-            let fft_result = price_call_fft_optimized(s, k, tau, r, sigma);
+            let fft_result = price_call_fft_optimized(s, k, tau, r, sigma, 0.0);
             
             // Test should pass if FFT calculation succeeds
             if let Ok(fft_call) = fft_result {
                 // Verify FFT price is within 1% of Black-Scholes
-                let relative_error = ((fft_call - bs_call) / bs_call).abs();
+                // Relative error with a 0.01 floor (as in the put test): a
+                // deep-OTM price of 1e-50 has no meaningful relative error.
+                let relative_error = ((fft_call - bs_call) / bs_call.max(0.01)).abs();
                 prop_assert!(
                     relative_error < 0.01,
                     "FFT call price {} differs from BS {} by {:.4}% (limit: 1%)",
@@ -59,8 +61,8 @@ mod fft_property_tests {
             prop_assume!(sigma < 1.0);
             prop_assume!((s/k).ln().abs() < 1.0);
             
-            let bs_put = price_put(s, k, tau, r, sigma).unwrap();
-            let fft_result = price_put_fft_optimized(s, k, tau, r, sigma);
+            let bs_put = price_put(s, k, tau, r, sigma, 0.0).unwrap();
+            let fft_result = price_put_fft_optimized(s, k, tau, r, sigma, 0.0);
             
             if let Ok(fft_put) = fft_result {
                 let relative_error = ((fft_put - bs_put) / bs_put.max(0.01)).abs();
@@ -138,7 +140,7 @@ mod fft_property_tests {
             sigma in 0.001..3.0f64,
         ) {
             // Test with potentially problematic parameters
-            let result = price_call_fft_optimized(s, k, tau, r, sigma);
+            let result = price_call_fft_optimized(s, k, tau, r, sigma, 0.0);
             
             match result {
                 Ok(price) => {
@@ -180,7 +182,7 @@ mod fft_property_tests {
             r in -1.0..1.0f64,
             sigma in -1.0..5.0f64,
         ) {
-            let result = price_call_fft_optimized(s, k, tau, r, sigma);
+            let result = price_call_fft_optimized(s, k, tau, r, sigma, 0.0);
             
             // Check if parameters are valid
             let params_valid = s > 0.0 && k > 0.0 && tau > 0.0 && sigma > 0.0 && sigma <= 2.0;
@@ -214,8 +216,8 @@ mod fft_property_tests {
         let r = 0.05;
         let sigma = 0.2;
         
-        let bs_call = price_call(s, k, tau, r, sigma).unwrap();
-        let fft_call = price_call_fft_optimized(s, k, tau, r, sigma).unwrap();
+        let bs_call = price_call(s, k, tau, r, sigma, 0.0).unwrap();
+        let fft_call = price_call_fft_optimized(s, k, tau, r, sigma, 0.0).unwrap();
         
         let relative_error = ((fft_call - bs_call) / bs_call).abs();
         assert!(relative_error < 0.005, "ATM option error too large: {:.4}%", relative_error * 100.0);
@@ -231,15 +233,15 @@ mod fft_property_tests {
         
         // Deep ITM call
         let k_itm = 70.0;
-        let bs_call_itm = price_call(s, k_itm, tau, r, sigma).unwrap();
-        let fft_call_itm = price_call_fft_optimized(s, k_itm, tau, r, sigma).unwrap();
+        let bs_call_itm = price_call(s, k_itm, tau, r, sigma, 0.0).unwrap();
+        let fft_call_itm = price_call_fft_optimized(s, k_itm, tau, r, sigma, 0.0).unwrap();
         let error_itm = ((fft_call_itm - bs_call_itm) / bs_call_itm).abs();
         assert!(error_itm < 0.02, "Deep ITM call error too large: {:.4}%", error_itm * 100.0);
         
         // Deep OTM call
         let k_otm = 130.0;
-        let bs_call_otm = price_call(s, k_otm, tau, r, sigma).unwrap();
-        let fft_call_otm = price_call_fft_optimized(s, k_otm, tau, r, sigma).unwrap();
+        let bs_call_otm = price_call(s, k_otm, tau, r, sigma, 0.0).unwrap();
+        let fft_call_otm = price_call_fft_optimized(s, k_otm, tau, r, sigma, 0.0).unwrap();
         let error_otm = ((fft_call_otm - bs_call_otm) / bs_call_otm.max(0.01)).abs();
         assert!(error_otm < 0.05, "Deep OTM call error too large: {:.4}%", error_otm * 100.0);
     }

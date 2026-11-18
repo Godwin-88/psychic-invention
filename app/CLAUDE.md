@@ -93,8 +93,8 @@ compute_var_all_methods(returns, weights, alpha, horizon_days, portfolio_value, 
 - `crowding.py`: Pairwise correlation-based crowding index.
 
 ### `app/vol/calibration.py`
-- `implied_vol_bs`: Newton-Raphson IV solver.
-- `heston_calibrate`: Differential evolution calibration to market option prices.
+- `implied_vol_bs`: Brent IV solver with no-arbitrage bound checks; raises `ImpliedVolError`; supports puts and dividend yield `q`.
+- `heston_calibrate`: vega-weighted (≈ IV-space) bounded least squares, multi-start; Feller optional (`enforce_feller`). Uses `price_heston_calls_batch` (Rust, parallel).
 
 ### `app/deriv_api_client.py`
 - WebSocket client to Deriv API.
@@ -160,12 +160,12 @@ pytest app/tests/test_pricing.py -v
 pytest app/tests/ --cov=app --cov-report=html
 
 # Rust tests
-cargo test
+cargo test --no-default-features
 
 # Property-based tests (Hypothesis + proptest)
 pytest app/tests/test_mathematical_consistency_properties.py -v
 pytest app/tests/test_deriv_api_properties.py -v
-cargo test --test greeks_property_tests
+cargo test --no-default-features --test greeks_property_tests
 ```
 
 ---

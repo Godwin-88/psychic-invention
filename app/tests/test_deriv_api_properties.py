@@ -19,7 +19,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from deriv_api_client import (
+from app.deriv_api_client import (
     DerivAPIClient, MarketData, OptionChain, OptionContract,
     AssetClass, MarketDataUnavailable, ValidationError, RateLimitExceeded
 )
@@ -439,7 +439,7 @@ class TestRateLimitBackoffBehavior:
         For any sequence of failures, the rate limiter should implement exponential
         backoff with jitter and respect maximum backoff limits.
         """
-        from deriv_api_client import RateLimiter
+        from app.deriv_api_client import RateLimiter
         
         # Create rate limiter with specified max backoff
         rate_limiter = RateLimiter(max_requests_per_second=10.0, max_backoff=max_backoff)
@@ -471,7 +471,7 @@ class TestRateLimitBackoffBehavior:
         """
         Property: Rate limiter should enforce minimum intervals between requests
         """
-        from deriv_api_client import RateLimiter
+        from app.deriv_api_client import RateLimiter
         
         rate_limiter = RateLimiter(max_requests_per_second=requests_per_second)
         
@@ -509,7 +509,7 @@ class TestDataCachingEfficiency:
         assume(len(cache_key.strip()) > 0)  # Ensure non-empty cache key
         assume(ttl_l2 >= ttl_l1)  # L2 TTL should be >= L1 TTL
         
-        from deriv_api_client import MarketDataCache
+        from app.deriv_api_client import MarketDataCache
         
         # Create cache with specified TTLs
         cache = MarketDataCache(l1_ttl=ttl_l1, l2_ttl=ttl_l2, max_size=100)
@@ -550,7 +550,7 @@ class TestDataCachingEfficiency:
         """
         assume(num_keys > 0 and max_size > 0)
         
-        from deriv_api_client import MarketDataCache
+        from app.deriv_api_client import MarketDataCache
         
         cache = MarketDataCache(l1_ttl=30, l2_ttl=300, max_size=max_size)
         
@@ -575,7 +575,7 @@ class TestDataCachingEfficiency:
         """
         Property: Cache should maintain data integrity for complex objects
         """
-        from deriv_api_client import MarketDataCache
+        from app.deriv_api_client import MarketDataCache
         
         cache = MarketDataCache(l1_ttl=30, l2_ttl=300, max_size=100)
         cache_key = f"market_data_{market_data.symbol}"

@@ -9,7 +9,6 @@ import { useFactorContext } from '@/context/FactorContext';
 import { MathText } from '@/components/ui/Math';
 
 const pct  = (v: number) => (v * 100).toFixed(2) + '%';
-const fmt3 = (v: number) => v.toFixed(3);
 
 type Method = 'quintile_sort' | 'signal_weighted';
 
@@ -104,7 +103,7 @@ function MomentumChart({ labels, scores }: { labels: string[]; scores: number[] 
 // ── Main panel ─────────────────────────────────────────────────────────────────
 export const SmartBetaPanel = () => {
   const {
-    labels, returnMatrix, momentumScores, weights,
+    labels, returnMatrix, momentumScores,
     smartBetaResult, smartBetaLoading, computeSmartBeta, error,
   } = useFactorContext();
 

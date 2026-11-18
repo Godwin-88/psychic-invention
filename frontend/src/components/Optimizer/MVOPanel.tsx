@@ -120,15 +120,13 @@ function WeightBars({ weights, labels }: { weights: number[]; labels: string[] }
 
 // ── Main panel ────────────────────────────────────────────────────────────────
 export const MVOPanel = () => {
-  const { mu, cov, labels, mvoResult, computeMVO, mvoLoading, rfRate, setRfRate, longOnly, setLongOnly, error } = useOptimizer();
+  const { cov, labels, mvoResult, computeMVO, mvoLoading, rfRate, setRfRate, longOnly, setLongOnly, error } = useOptimizer();
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [rfInput, setRfInput] = useState(String(rfRate * 100));
 
   useEffect(() => { setSelectedIdx(null); }, [mvoResult]);
 
   const selected = selectedIdx !== null ? mvoResult?.frontier[selectedIdx] : null;
-  const displayWeights = selected?.weights ?? mvoResult?.tangency
-    ? (selected?.weights ?? mvoResult!.tangency.weights) : null;
 
   return (
     <div className="space-y-6">

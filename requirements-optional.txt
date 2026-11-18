@@ -1,0 +1,9 @@
+# Optional integrations — heavy installs, not needed by the core API.
+-r requirements.txt
+openbb>=4                  # broader market data / news (falls back to yfinance)
+networkx>=3                # MST (a built-in Prim fallback exists)
+QuantLib>=1.34             # cross-checks
+statsmodels>=0.14
+arch>=6                    # GARCH
+scikit-learn>=1.3
+# nautilus_trader>=1.220   # Blotter live data / execution (optional)

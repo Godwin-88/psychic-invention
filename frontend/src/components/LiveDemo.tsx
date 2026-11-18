@@ -1,11 +1,11 @@
 // Wall Street Themed Live Demo Component
 import { useState } from 'react';
 import { Button } from './Button';
-import { usePricing } from '@/hooks/useApi';
+import { useBlackScholesPricing } from '@/hooks/useApi';
 import type { OptionRequest } from '@/types';
 
 export const LiveDemo = () => {
-  const { calculatePrice, loading, error, result } = usePricing();
+  const { calculate: calculatePrice, loading, error, result } = useBlackScholesPricing();
   const [formData, setFormData] = useState<OptionRequest>({
     s: 100,
     k: 100,
@@ -149,7 +149,7 @@ export const LiveDemo = () => {
                   {/* Main Price Display */}
                   <div className="bg-gradient-to-r from-primary-600 to-primary-700 p-6 rounded-lg text-center">
                     <div className="text-4xl font-bold text-white font-mono">
-                      ${result.price.toFixed(4)}
+                      ${result.callPrice.toFixed(4)}
                     </div>
                     <div className="text-primary-100 text-sm mt-1">Call Option Premium</div>
                   </div>

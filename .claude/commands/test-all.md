@@ -18,7 +18,7 @@ Run the full test suite: Python (pytest), Rust (cargo test), and Frontend (vites
 
 3. **Rust tests**:
    ```bash
-   cargo test 2>&1
+   cargo test --no-default-features 2>&1
    ```
    Report pass/fail count.
 

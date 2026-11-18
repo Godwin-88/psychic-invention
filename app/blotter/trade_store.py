@@ -1,20 +1,34 @@
 """
-Trade Store — basic trade entry and P&L tracking.
-In-memory store; can be extended to SQLite.
+Trade Store — in-memory trade ledger with FIFO position accounting.
+
+Positions, realised and unrealised P&L come from app.blotter.position_engine
+(shared with the Postgres blotter). State is per process: with several
+workers, set DATABASE_URL so the Postgres blotter is used instead.
 """
 
-from dataclasses import dataclass, field
-from datetime import datetime
-from typing import List, Optional
+from __future__ import annotations
+
+import threading
 import uuid
+from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
+from typing import List, Optional
+
+from .position_engine import PositionView, build_books, pnl_totals, position_views
+
+# Backwards-compatible name: positions are PositionView objects with the old
+# fields (asset, quantity, direction, entry_price, entry_date, current_price,
+# unrealized_pnl, unrealized_pnl_pct) plus realised P&L, fees and exposure.
+Position = PositionView
 
 
 @dataclass
 class Trade:
-    """Single trade record."""
+    """Single trade record (a fill)."""
+
     id: str
     asset: str
-    direction: str  # "long" | "short"
+    direction: str  # "long" = buy, "short" = sell
     quantity: float
     entry_price: float
     entry_date: str
@@ -22,26 +36,18 @@ class Trade:
     theoretical_price_at_entry: Optional[float] = None
     strategy_tag: Optional[str] = None
     asset_class: Optional[str] = None
-
-
-@dataclass
-class Position:
-    """Aggregated position with live P&L."""
-    asset: str
-    quantity: float
-    direction: str
-    entry_price: float
-    entry_date: str
-    current_price: float
-    unrealized_pnl: float
-    unrealized_pnl_pct: float
+    fees: float = 0.0
+    multiplier: float = 1.0
+    seq: int = 0
 
 
 class TradeStore:
-    """In-memory trade ledger."""
+    """Thread-safe in-memory trade ledger."""
 
     def __init__(self):
         self._trades: List[Trade] = []
+        self._lock = threading.Lock()
+        self._seq = 0
 
     def add_trade(
         self,
@@ -54,22 +60,51 @@ class TradeStore:
         theoretical_price: Optional[float] = None,
         strategy_tag: Optional[str] = None,
         asset_class: Optional[str] = None,
+        fees: float = 0.0,
+        multiplier: float = 1.0,
     ) -> Trade:
-        """Add a new trade."""
-        trade = Trade(
-            id=str(uuid.uuid4()),
-            asset=asset,
-            direction=direction.lower(),
-            quantity=abs(quantity),
-            entry_price=entry_price,
-            entry_date=entry_date or datetime.utcnow().strftime("%Y-%m-%d"),
-            model_used=model_used,
-            theoretical_price_at_entry=theoretical_price,
-            strategy_tag=strategy_tag,
-            asset_class=asset_class,
-        )
-        self._trades.append(trade)
-        return trade
+        direction = direction.lower()
+        if direction not in ("long", "short"):
+            raise ValueError("direction must be 'long' or 'short'")
+        if not quantity or quantity <= 0:
+            raise ValueError("quantity must be positive (use direction for the side)")
+        if entry_price is None or entry_price <= 0:
+            raise ValueError("entry_price must be positive")
+        if fees < 0:
+            raise ValueError("fees cannot be negative")
+        if multiplier <= 0:
+            raise ValueError("multiplier must be positive")
+        if entry_date:
+            datetime.strptime(entry_date, "%Y-%m-%d")  # validate format
+        with self._lock:
+            existing = next((t for t in self._trades if t.asset == asset), None)
+            if existing is not None and existing.multiplier != multiplier:
+                raise ValueError(
+                    f"multiplier for {asset} is {existing.multiplier}, got {multiplier}"
+                )
+            self._seq += 1
+            trade = Trade(
+                id=str(uuid.uuid4()),
+                asset=asset,
+                direction=direction,
+                quantity=float(quantity),
+                entry_price=float(entry_price),
+                entry_date=entry_date or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                model_used=model_used,
+                theoretical_price_at_entry=theoretical_price,
+                strategy_tag=strategy_tag,
+                asset_class=asset_class,
+                fees=float(fees),
+                multiplier=float(multiplier),
+                seq=self._seq,
+            )
+            self._trades.append(trade)
+            return trade
+
+    def _ordered(self) -> List[dict]:
+        with self._lock:
+            trades = sorted(self._trades, key=lambda t: (t.entry_date, t.seq))
+        return [asdict(t) for t in trades]
 
     def get_trades(
         self,
@@ -78,8 +113,8 @@ class TradeStore:
         from_date: Optional[str] = None,
         to_date: Optional[str] = None,
     ) -> List[Trade]:
-        """Filter trades."""
-        out = self._trades
+        with self._lock:
+            out = list(self._trades)
         if asset:
             out = [t for t in out if t.asset == asset]
         if strategy_tag:
@@ -94,42 +129,14 @@ class TradeStore:
         self,
         current_prices: dict,
         as_of_date: Optional[str] = None,
-    ) -> List[Position]:
-        """Aggregate trades into positions with P&L. If as_of_date given, only include trades on/before that date."""
-        positions: dict = {}
-        trades = self._trades
-        if as_of_date:
-            trades = [t for t in trades if t.entry_date <= as_of_date]
-        for t in trades:
-            key = (t.asset, t.direction)
-            if key not in positions:
-                positions[key] = {"qty": 0, "cost": 0.0, "entry_date": t.entry_date}
-            mult = 1 if t.direction == "long" else -1
-            positions[key]["qty"] += mult * t.quantity
-            positions[key]["cost"] += mult * t.quantity * t.entry_price
+        include_flat: bool = False,
+    ) -> List[PositionView]:
+        """Net FIFO positions per asset. Assets without a price are marked at cost."""
+        books = build_books(self._ordered(), as_of_date)
+        return position_views(books, current_prices or {}, include_flat)
 
-        result = []
-        for (asset, direction), data in positions.items():
-            qty = data["qty"]
-            if qty == 0:
-                continue
-            avg_price = data["cost"] / qty if qty != 0 else 0
-            current = current_prices.get(asset, avg_price)
-            pnl = (current - avg_price) * qty
-            pnl_pct = (pnl / (avg_price * abs(qty)) * 100) if avg_price * qty != 0 else 0
-            result.append(
-                Position(
-                    asset=asset,
-                    quantity=abs(qty),
-                    direction="long" if qty > 0 else "short",
-                    entry_price=avg_price,
-                    entry_date=data["entry_date"],
-                    current_price=current,
-                    unrealized_pnl=pnl,
-                    unrealized_pnl_pct=pnl_pct,
-                )
-            )
-        return result
+    def get_pnl_summary(self, current_prices: dict, as_of_date: Optional[str] = None) -> dict:
+        return pnl_totals(build_books(self._ordered(), as_of_date), current_prices or {})
 
     def get_cumulative_pnl(
         self,
@@ -137,25 +144,25 @@ class TradeStore:
         from_date: Optional[str] = None,
         to_date: Optional[str] = None,
     ) -> float:
-        """Total unrealized P&L across all positions."""
-        positions = self.get_positions(current_prices)
-        return sum(p.unrealized_pnl for p in positions)
+        """Net P&L (realised + unrealised − fees) as of `to_date` (default: all trades)."""
+        return self.get_pnl_summary(current_prices, to_date)["net_pnl"]
 
     def get_history(self) -> List[dict]:
-        """Full transaction history as dicts."""
         return [
             {
-                "id": t.id,
-                "asset": t.asset,
-                "direction": t.direction,
-                "quantity": t.quantity,
-                "entry_price": t.entry_price,
-                "entry_date": t.entry_date,
-                "model_used": t.model_used,
-                "theoretical_price_at_entry": t.theoretical_price_at_entry,
-                "strategy_tag": t.strategy_tag,
+                "id": t["id"],
+                "asset": t["asset"],
+                "direction": t["direction"],
+                "quantity": t["quantity"],
+                "entry_price": t["entry_price"],
+                "entry_date": t["entry_date"],
+                "model_used": t["model_used"],
+                "theoretical_price_at_entry": t["theoretical_price_at_entry"],
+                "strategy_tag": t["strategy_tag"],
+                "fees": t["fees"],
+                "multiplier": t["multiplier"],
             }
-            for t in self._trades
+            for t in self._ordered()
         ]
 
     def get_pnl_timeseries(
@@ -165,43 +172,44 @@ class TradeStore:
         to_date: Optional[str] = None,
     ) -> List[dict]:
         """
-        Build cumulative P&L time series from price history.
-        price_history: [{"date": "2024-01-01", "prices": {"AAPL": 150, "GOOG": 140}}, ...]
-        Returns: [{"date": str, "cumulative_pnl": float, "positions_value": float}, ...]
+        Net P&L through time.
+        price_history: [{"date": "2024-01-01", "prices": {"AAPL": 150}}, ...]
+        Returns [{"date", "cumulative_pnl", "realized_pnl", "unrealized_pnl",
+                  "fees", "positions_value"}, ...]
         """
+        trades = self._ordered()
         out = []
-        sorted_ph = sorted(price_history, key=lambda x: x.get("date", ""))
-        for ph in sorted_ph:
+        for ph in sorted(price_history, key=lambda x: x.get("date", "")):
             date = ph.get("date", "")
-            prices = ph.get("prices", {})
-            if from_date and date < from_date:
+            if (from_date and date < from_date) or (to_date and date > to_date):
                 continue
-            if to_date and date > to_date:
-                continue
-            positions = self.get_positions(prices, as_of_date=date)
-            total_cost = sum(
-                p.entry_price * p.quantity * (1 if p.direction == "long" else -1)
-                for p in positions
+            totals = pnl_totals(build_books(trades, date), ph.get("prices", {}))
+            out.append(
+                {
+                    "date": date,
+                    "cumulative_pnl": totals["net_pnl"],
+                    "realized_pnl": totals["realized_pnl"],
+                    "unrealized_pnl": totals["unrealized_pnl"],
+                    "fees": totals["fees"],
+                    "positions_value": totals["net_exposure"],
+                }
             )
-            total_value = sum(
-                prices.get(p.asset, p.entry_price) * p.quantity * (1 if p.direction == "long" else -1)
-                for p in positions
-            )
-            cum_pnl = total_value - total_cost if total_cost != 0 else 0
-            out.append({
-                "date": date,
-                "cumulative_pnl": cum_pnl,
-                "positions_value": total_value,
-            })
         return out
 
+    def clear(self) -> None:
+        with self._lock:
+            self._trades.clear()
+            self._seq = 0
 
-# Singleton for API use
+
 _store: Optional[TradeStore] = None
+_store_lock = threading.Lock()
 
 
 def get_trade_store() -> TradeStore:
     global _store
     if _store is None:
-        _store = TradeStore()
+        with _store_lock:
+            if _store is None:
+                _store = TradeStore()
     return _store

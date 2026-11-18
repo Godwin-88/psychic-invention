@@ -127,7 +127,7 @@ def test_my_model_call_basic():
 ### 8. Run all checks
 
 ```bash
-cargo test
+cargo test --no-default-features
 pytest app/tests/test_my_model.py -v
 ```
 

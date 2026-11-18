@@ -161,47 +161,47 @@ export const useMarketData = (symbol?: string, autoRefresh = false, refreshInter
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<MarketDataResponse | null>(null);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // In-flight request per symbol: repeated refreshes join it instead of
+  // issuing duplicate API calls.
+  const inFlightRef = useRef<{ key: string; promise: Promise<void> } | null>(null);
 
-  const fetchMarketData = useCallback(async (request: MarketDataRequest) => {
+  const fetchMarketData = useCallback((request: MarketDataRequest): Promise<void> => {
+    const key = JSON.stringify(request);
+    if (inFlightRef.current?.key === key) return inFlightRef.current.promise;
+
     setLoading(true);
     setError(null);
-    
-    try {
-      const response = await getMarketData(request);
-      setData(response);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch market data');
-      setData(null);
-    } finally {
-      setLoading(false);
-    }
+    const promise = (async () => {
+      try {
+        const response = await getMarketData(request);
+        setData(response);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch market data');
+        setData(null);
+      } finally {
+        if (inFlightRef.current?.key === key) inFlightRef.current = null;
+        setLoading(false);
+      }
+    })();
+    inFlightRef.current = { key, promise };
+    return promise;
   }, []);
 
-  // Auto-refresh functionality
+  const isAutoRefreshing = Boolean(autoRefresh && symbol);
+
+  // Auto-refresh: initial fetch, then every refreshInterval ms.
   useEffect(() => {
-    if (autoRefresh && symbol) {
-      const startAutoRefresh = () => {
-        if (intervalRef.current) {
-          clearInterval(intervalRef.current);
-        }
-        
-        intervalRef.current = setInterval(() => {
-          fetchMarketData({ symbol });
-        }, refreshInterval);
-      };
-
-      // Initial fetch
+    if (!isAutoRefreshing || !symbol) return;
+    fetchMarketData({ symbol });
+    intervalRef.current = setInterval(() => {
       fetchMarketData({ symbol });
-      startAutoRefresh();
-
-      return () => {
-        if (intervalRef.current) {
-          clearInterval(intervalRef.current);
-        }
-      };
-    }
-  }, [symbol, autoRefresh, refreshInterval, fetchMarketData]);
+    }, refreshInterval);
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    };
+  }, [symbol, isAutoRefreshing, refreshInterval, fetchMarketData]);
 
   const stopAutoRefresh = useCallback(() => {
     if (intervalRef.current) {
@@ -210,13 +210,14 @@ export const useMarketData = (symbol?: string, autoRefresh = false, refreshInter
     }
   }, []);
 
-  return { 
-    fetchMarketData, 
-    loading, 
-    error, 
-    data, 
+  return {
+    fetchMarketData,
+    loading,
+    error,
+    data,
     stopAutoRefresh,
-    isAutoRefreshing: intervalRef.current !== null 
+    // Derived from props (not the interval ref) so the UI updates immediately.
+    isAutoRefreshing,
   };
 };
 

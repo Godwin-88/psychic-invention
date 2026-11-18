@@ -127,6 +127,8 @@ interface RiskContextValue {
   weights: number[];
   labels: string[];
   dataSource: DataSource;
+  /** True while the built-in demo dataset is loaded. */
+  usingDemo: boolean;
   dataFetchPeriod: string;
   setDataFetchPeriod: (p: string) => void;
 
@@ -384,7 +386,7 @@ export function RiskProvider({ children }: { children: ReactNode }) {
   }, [computeVar, computeCovHealth, computeMst]);
 
   const value = useMemo<RiskContextValue>(() => ({
-    returns, weights, labels, dataSource, dataFetchPeriod, setDataFetchPeriod,
+    returns, weights, labels, dataSource, usingDemo: dataSource === 'demo', dataFetchPeriod, setDataFetchPeriod,
     fetchLiveData, fetchLoading, fetchError,
     setReturns, setWeights, setLabels, loadDemoData,
     alpha, setAlpha, horizonDays, setHorizonDays, portfolioValue, setPortfolioValue,

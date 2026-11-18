@@ -18,7 +18,6 @@ import { computeCallGreeks } from '@/utils/greeks';
 import { MathText } from '@/components/ui/Math';
 
 // ── BS pricing (client-side) ──────────────────────────────────────────────────
-const INV_SQRT2PI = 1 / Math.sqrt(2 * Math.PI);
 function erf(x: number) {
   const sign = Math.sign(x) || 1;
   const t = 1 / (1 + 0.3275911 * Math.abs(x));

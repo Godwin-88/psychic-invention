@@ -32,10 +32,6 @@ export const VolatilitySurfaceChart: React.FC<VolatilitySurfaceChartProps> = ({
     const chartHeight = height - margin.top - margin.bottom;
 
     // Find min/max values for scaling
-    const minStrike = Math.min(...data.strikes);
-    const maxStrike = Math.max(...data.strikes);
-    const minExpiration = Math.min(...data.expirations);
-    const maxExpiration = Math.max(...data.expirations);
     
     const allVols = data.volatilities.flat();
     const minVol = Math.min(...allVols);
@@ -162,6 +158,8 @@ export const VolatilitySurfaceChart: React.FC<VolatilitySurfaceChartProps> = ({
         ref={canvasRef}
         width={width}
         height={height}
+        role="img"
+        aria-label="Implied volatility surface by strike and expiration"
         className="max-w-full h-auto"
       />
     </div>

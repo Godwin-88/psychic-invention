@@ -15,8 +15,9 @@ import time
 import uuid
 from typing import Any, Optional
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
+from app.security import require_admin
 
 from app.knowledge_base.neo4j_client import (
     get_neo4j_driver,
@@ -350,7 +351,7 @@ def _run_enrichment_pass() -> None:
         logger.error("RLHF enrichment pass failed: %s", e)
 
 
-@router.post("/enrich")
+@router.post("/enrich", dependencies=[Depends(require_admin)])
 async def agents_enrich(background_tasks: BackgroundTasks):
     """
     Manually trigger a RLHF GraphRAG enrichment pass (admin use).

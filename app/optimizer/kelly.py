@@ -44,49 +44,52 @@ def kelly_multi_asset(
     returns: np.ndarray,
     fractional: float = 1.0,
     long_only: bool = True,
+    max_leverage: float = 1.0,
 ) -> KellyResult:
     """
-    Multi-asset Kelly: maximize E[ln(1 + w^T r)].
-    fractional: κ ∈ (0,1] scales weights (half-Kelly etc).
+    Multi-asset Kelly: maximize the empirical log-growth (1/T) Σ_t ln(1 + w'r_t).
+
+    The objective is concave in w (log of an affine function), so the problem is
+    DCP-compliant. Capital not allocated to risky assets is held in cash
+    (return 0), so gross exposure ‖w‖₁ ≤ max_leverage rather than Σw = 1.
+
+    fractional: κ ∈ (0,1] scales the growth-optimal weights (half-Kelly = 0.5).
+    long_only: if False, short positions are allowed.
     """
     if not CVXPY_AVAILABLE:
         raise ImportError("cvxpy required for multi-asset Kelly")
+    if not 0 < fractional <= 1:
+        raise ValueError("fractional must be in (0, 1]")
+    if max_leverage <= 0:
+        raise ValueError("max_leverage must be positive")
 
-    returns = np.asarray(returns)
+    returns = np.asarray(returns, dtype=float)
+    if returns.ndim != 2:
+        raise ValueError("returns must be a 2-D array (T x N)")
     n_obs, n_assets = returns.shape
-    mean_r = np.mean(returns, axis=0)
 
-    # Convex approximation: -E[ln(1+w'r)] ≈ -E[w'r] + ½E[(w'r)²] for small r
-    # More stable: use log objective via geometric mean approximation
     w = cp.Variable(n_assets)
-
-    # Maximize sum log(1 + r_t' w) — concave. Clip for numerical stability.
-    log_terms = []
-    for t in range(n_obs):
-        r_t = returns[t, :]
-        log_terms.append(cp.log(cp.maximum(1 + r_t @ w, 1e-6)))
-
-    objective = cp.Maximize(cp.sum(log_terms) / n_obs)
-    constraints = [cp.sum(w) == 1]
+    # The domain of cp.log enforces 1 + r_t'w > 0: no scenario wipes out capital.
+    objective = cp.Maximize(cp.sum(cp.log(1 + returns @ w)) / n_obs)
+    constraints = [cp.norm1(w) <= max_leverage]
     if long_only:
         constraints.append(w >= 0)
 
     prob = cp.Problem(objective, constraints)
     prob.solve(verbose=False)
 
-    if prob.status not in ["optimal", "optimal_inaccurate"]:
+    if prob.status not in ["optimal", "optimal_inaccurate"] or w.value is None:
         raise ValueError(f"Kelly optimization failed: {prob.status}")
 
-    w_val = np.array(w.value).flatten()
-    w_val = np.maximum(w_val, 0)
-    w_val = w_val / w_val.sum()
+    w_val = np.array(w.value, dtype=float).flatten()
+    w_val[np.abs(w_val) < 1e-9] = 0.0
+    if long_only:
+        w_val = np.maximum(w_val, 0.0)
+    w_val = w_val * fractional
 
-    if fractional < 1.0:
-        w_val = w_val * fractional
-
-    # Expected log growth
     gross = 1 + returns @ w_val
-    gross = np.clip(gross, 1e-10, 1e10)
+    if np.any(gross <= 0):
+        raise ValueError("Kelly weights imply total loss in at least one scenario")
     g_mean = float(np.mean(np.log(gross)))
 
     return KellyResult(

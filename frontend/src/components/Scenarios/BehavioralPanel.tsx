@@ -164,7 +164,7 @@ function VarCompBar({ base, stressed, label }: { base: number; stressed: number;
 // ── Main panel ────────────────────────────────────────────────────────────────
 export const BehavioralPanel = () => {
   const {
-    returnMatrix, weights,
+    returnMatrix,
     behavResult, behavLoading, computeBehavioral, error,
   } = useScenariosContext();
 
@@ -178,8 +178,6 @@ export const BehavioralPanel = () => {
   const alpha   = 0.88;
   const lambda_ = 2.25;
   const beta    = 0.88;
-  const gamma   = 0.61;
-  const delta   = 0.69;
 
   const run = () => {
     computeBehavioral(mode, corrShift, 0.05, portfolioValue);

@@ -25,7 +25,7 @@ const money = (v: number) => v >= 1e6
 
 // ── Terminal wealth percentile fan chart ─────────────────────────────────────
 function WealthFan({
-  mean, std, p5, p25, p50, p75, p95, initial,
+  mean, p5, p25, p50, p75, p95, initial,
 }: {
   mean: number; std: number;
   p5: number; p25: number; p50: number; p75: number; p95: number;
@@ -39,12 +39,10 @@ function WealthFan({
   const maxV = Math.max(...allV) * 1.03;
   const rng  = maxV - minV || 1;
 
-  const px = (x: number, totalW: number) => pad.l + ((x - minV) / rng) * (totalW - pad.l - pad.r);
   const barX0 = pad.l; const barW = W - pad.l - pad.r;
 
   const pxv = (v: number) => pad.l + ((v - minV) / rng) * barW;
 
-  const yTicks = [p5, p25, p50, p75, p95, initial].filter((v, i, a) => a.indexOf(v) === i).sort((a, b) => a - b);
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: H }}>

@@ -481,9 +481,9 @@ async def check_market_data_api() -> HealthCheckResult:
     """Check market data API connectivity"""
     try:
         # Import here to avoid circular imports
-        from deriv_api_client import create_test_client
+        from .deriv_api_client import create_test_client
         
-        async with create_test_client() as client:
+        async with await create_test_client() as client:
             # Test basic connectivity
             is_connected = await client.validate_connection()
             

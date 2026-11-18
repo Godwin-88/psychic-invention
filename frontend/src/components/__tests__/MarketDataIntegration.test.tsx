@@ -145,13 +145,6 @@ const mockSupportedSymbols = {
   note: 'Sample symbols for testing',
 };
 
-const mockBlackScholesResult = {
-  callPrice: 8.55,
-  putPrice: 5.85,
-  model: 'Black-Scholes',
-  responseTime: 15,
-};
-
 describe('Market Data Integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -218,7 +211,7 @@ describe('Market Data Integration', () => {
       });
       
       // Set expiry date and fetch option chain
-      const expiryInput = screen.getByDisplayValue('2024-03-15');
+      screen.getByDisplayValue('2024-03-15');
       const fetchChainButton = screen.getByText('Fetch Chain');
       
       fireEvent.click(fetchChainButton);
@@ -238,8 +231,9 @@ describe('Market Data Integration', () => {
     });
 
     it('should enable auto-refresh functionality', async () => {
-      vi.useFakeTimers();
-      
+      // shouldAdvanceTime keeps Testing Library's waitFor polling working.
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+
       render(<MarketDataDashboard />);
       
       // Wait for component to load
@@ -252,13 +246,23 @@ describe('Market Data Integration', () => {
       fireEvent.click(autoRefreshButton);
       
       expect(screen.getByText('Stop Auto-Refresh')).toBeInTheDocument();
-      
-      // Fast-forward time to trigger auto-refresh
-      vi.advanceTimersByTime(30000);
-      
+      await vi.advanceTimersByTimeAsync(0); // let the immediate fetch settle
+      const before = vi.mocked(apiUtils.getMarketData).mock.calls.length;
+
+      // Fast-forward time: one more fetch per 30 s interval
+      await vi.advanceTimersByTimeAsync(30000);
       await waitFor(() => {
-        expect(apiUtils.getMarketData).toHaveBeenCalledTimes(2); // Initial + auto-refresh
+        expect(apiUtils.getMarketData).toHaveBeenCalledTimes(before + 1);
       });
+      await vi.advanceTimersByTimeAsync(30000);
+      await waitFor(() => {
+        expect(apiUtils.getMarketData).toHaveBeenCalledTimes(before + 2);
+      });
+
+      // Stopping auto-refresh stops the interval
+      fireEvent.click(screen.getByText('Stop Auto-Refresh'));
+      await vi.advanceTimersByTimeAsync(60000);
+      expect(apiUtils.getMarketData).toHaveBeenCalledTimes(before + 2);
       
       vi.useRealTimers();
     });
@@ -357,8 +361,9 @@ describe('Market Data Integration', () => {
     });
 
     it('should handle real-time data updates', async () => {
-      vi.useFakeTimers();
-      
+      // shouldAdvanceTime keeps Testing Library's waitFor polling working.
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+
       render(<MarketDataDashboard />);
       
       // Wait for component to load
@@ -382,7 +387,7 @@ describe('Market Data Integration', () => {
       vi.mocked(apiUtils.getMarketData).mockResolvedValue(updatedMarketData);
       
       // Fast-forward time to trigger auto-refresh
-      vi.advanceTimersByTime(30000);
+      await vi.advanceTimersByTimeAsync(30000);
       
       await waitFor(() => {
         expect(screen.getByText('$151.50')).toBeInTheDocument();
@@ -466,16 +471,20 @@ describe('Market Data Integration', () => {
         expect(screen.getByDisplayValue('AAPL')).toBeInTheDocument();
       });
       
-      // Make multiple requests quickly
+      await waitFor(() => expect(apiUtils.getMarketData).toHaveBeenCalledTimes(1)); // on mount
+
+      // Rapid repeated refreshes join the in-flight request: one extra call.
+      let release!: () => void;
+      vi.mocked(apiUtils.getMarketData).mockImplementationOnce(
+        () => new Promise(resolve => { release = () => resolve(mockMarketData); }),
+      );
       const refreshButton = screen.getByText('Refresh');
       fireEvent.click(refreshButton);
       fireEvent.click(refreshButton);
       fireEvent.click(refreshButton);
-      
-      await waitFor(() => {
-        // Should only make one API call due to caching/debouncing
-        expect(apiUtils.getMarketData).toHaveBeenCalledTimes(1);
-      });
+      expect(apiUtils.getMarketData).toHaveBeenCalledTimes(2);
+      release();
+      await waitFor(() => expect(screen.getAllByText(/150\.25|AAPL/).length).toBeGreaterThan(0));
     });
 
     it('should display data age information', async () => {

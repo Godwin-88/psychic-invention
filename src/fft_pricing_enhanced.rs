@@ -53,42 +53,32 @@ impl FFTParameters {
             ));
         }
 
-        let moneyness = (s / k).ln();
         let log_k = k.ln();
-        
-        // Adaptive parameter selection based on option characteristics
-        let alpha = if tau < 0.25 {
-            // Short-term options need higher damping
-            if moneyness.abs() > 0.3 { 2.0 } else { 1.75 }
-        } else if tau > 2.0 {
-            // Long-term options can use lower damping
-            if moneyness.abs() > 0.2 { 1.25 } else { 1.0 }
-        } else {
-            // Medium-term options
-            if moneyness.abs() > 0.2 { 1.5 } else { 1.25 }
-        };
+        let sd = sigma * tau.sqrt(); // total volatility over the option's life
+        let moneyness = (s / k).ln();
 
-        // Grid size based on volatility and time to expiration
-        let n = if sigma > 0.5 || tau > 1.5 {
-            8192  // High volatility or long maturity needs finer grid
-        } else if sigma < 0.15 && tau < 0.25 {
-            2048  // Low volatility, short maturity can use coarser grid
-        } else {
-            4096  // Standard grid size
-        };
+        // Carr–Madan damping. 1.5 is the standard choice for lognormal
+        // dynamics: large enough to tame the singularity at v = 0, small
+        // enough to keep E[S^(α+1)] modest.
+        let alpha = 1.5;
 
-        // Frequency step based on volatility
-        let delta_v = if sigma > 0.4 {
-            0.005  // High volatility needs finer frequency resolution
-        } else if sigma < 0.15 {
-            0.02   // Low volatility can use coarser resolution
-        } else {
-            0.01   // Standard resolution
-        };
+        // Upper frequency: the BS characteristic function decays like
+        // exp(−½·sd²·v²); integrate until it has fallen below e^(−40).
+        let v_max = (80.0f64).sqrt() / sd;
 
+        // Frequency step: resolve both the oscillation of e^{−iv·ln K}
+        // against the forward (rate |ln F/K|) and the damping denominator
+        // (scale ~1), with ≥ 25 points per period.
+        let osc = moneyness.abs() + sd + 1.0;
+        let dv_target = (2.0 * PI / osc / 25.0).min(0.05);
+
+        let n = ((v_max / dv_target).ceil() as usize)
+            .next_power_of_two()
+            .clamp(1024, 1 << 16);
+        let delta_v = v_max / n as f64;
         let delta_k = 2.0 * PI / (n as f64 * delta_v);
-        
-        // Center the grid around the current log-strike
+
+        // Center the log-strike grid on ln K so the target strike is a node.
         let k_min = log_k - (n as f64 / 2.0) * delta_k;
 
         let params = FFTParameters {
@@ -129,9 +119,9 @@ impl FFTParameters {
             ));
         }
 
-        if self.delta_v < 0.001 || self.delta_v > 0.1 {
+        if self.delta_v < 1e-4 || self.delta_v > 0.1 {
             return Err(FFTError::NumericalInstability(
-                "Delta_v parameter outside stable range [0.001, 0.1]".to_string()
+                "Delta_v parameter outside stable range [0.0001, 0.1]".to_string()
             ));
         }
 
@@ -163,17 +153,20 @@ fn bs_log_cf_enhanced(
 }
 
 /// Enhanced Carr–Madan integrand with stability checks
+#[allow(clippy::too_many_arguments)]
 fn psi_carr_madan_enhanced(
     v: f64,
     alpha: f64,
     s: f64,
     r: f64,
+    q: f64,
     sigma: f64,
     tau: f64,
 ) -> Result<Complex<f64>, FFTError> {
     let u = Complex::new(v, -(alpha + 1.0));
 
-    let cf = bs_log_cf_enhanced(u, s, r, sigma, tau)?;
+    // Log-price drifts at r − q; payoff discounted at r.
+    let cf = bs_log_cf_enhanced(u, s, r - q, sigma, tau)?;
     let discount = (-r * tau).exp();
 
     // Enhanced denominator calculation with stability check
@@ -193,24 +186,28 @@ fn psi_carr_madan_enhanced(
 
 /// Enhanced FFT‐based Carr–Madan pricing for European calls with automatic parameter optimization
 #[pyfunction]
+#[pyo3(signature = (s, k, tau, r, sigma, q=0.0))]
 pub fn price_call_fft_optimized(
     s: f64,
     k: f64,
     tau: f64,
     r: f64,
     sigma: f64,
+    q: f64,
 ) -> PyResult<f64> {
     // Optimize parameters automatically
     let params = FFTParameters::optimize_for_stability(s, k, tau, sigma)
         .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
 
     // Call the enhanced FFT pricing function
-    price_call_fft_enhanced(s, k, params.k_min, params.delta_v, params.delta_k, 
-                           params.n, tau, r, sigma, params.alpha)
+    price_call_fft_enhanced(s, k, params.k_min, params.delta_v, params.delta_k,
+                           params.n, tau, r, sigma, params.alpha, q)
 }
 
 /// Enhanced FFT‐based Carr–Madan pricing for European calls with stability checks
 #[pyfunction]
+#[pyo3(signature = (s, k, k_min, delta_v, delta_k, n, tau, r, sigma, alpha, q=0.0))]
+#[allow(clippy::too_many_arguments)]
 pub fn price_call_fft_enhanced(
     s: f64,
     k: f64,
@@ -222,6 +219,7 @@ pub fn price_call_fft_enhanced(
     r: f64,
     sigma: f64,
     alpha: f64,
+    q: f64,
 ) -> PyResult<f64> {
     // Create and validate parameters
     let params = FFTParameters {
@@ -235,6 +233,19 @@ pub fn price_call_fft_enhanced(
     params.validate()
         .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
 
+    // Only one strike is priced, so shift the user's log-strike grid (keeping
+    // its spacing) so that ln K falls exactly on a node. Without this the
+    // price returned was for the nearest node's strike, not for K.
+    let target_k = k.ln();
+    let j_target_f = ((target_k - k_min) / delta_k).round();
+    if !(0.0..n as f64).contains(&j_target_f) {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            format!("Target strike {} outside grid range", k)
+        ));
+    }
+    let j_target = j_target_f as usize;
+    let k_min = target_k - j_target as f64 * delta_k;
+
     let mut planner = FftPlanner::<f64>::new();
     let fft = planner.plan_fft_forward(n);
 
@@ -243,11 +254,14 @@ pub fn price_call_fft_enhanced(
     for m in 0..n {
         let v_m = m as f64 * delta_v;
 
-        let psi = psi_carr_madan_enhanced(v_m, alpha, s, r, sigma, tau)
+        let psi = psi_carr_madan_enhanced(v_m, alpha, s, r, q, sigma, tau)
             .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
 
-        // Trapezoidal rule with proper weighting
-        let weight = if m == 0 { 0.5 * delta_v } else { delta_v };
+        // Simpson's rule weights (Carr & Madan 1999, eq. 24):
+        // w_m = Δv/3 · (3 + (−1)^{m+1} − δ_{m0})
+        let sign = if m % 2 == 0 { -1.0 } else { 1.0 };
+        let kron = if m == 0 { 1.0 } else { 0.0 };
+        let weight = delta_v / 3.0 * (3.0 + sign - kron);
 
         // Phase shift for grid positioning
         let phase = Complex::new(0.0, -v_m * k_min).exp();
@@ -258,16 +272,6 @@ pub fn price_call_fft_enhanced(
     // Perform FFT
     let mut output = input.clone();
     fft.process(&mut output);
-
-    // Find the target strike in the grid
-    let target_k = k.ln();
-    let j_target = ((target_k - k_min) / delta_k).round() as usize;
-    
-    if j_target >= n {
-        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-            format!("Target strike {} outside grid range", k)
-        ));
-    }
 
     // Recover call price with enhanced calculation
     let k_j = k_min + j_target as f64 * delta_k;
@@ -286,19 +290,20 @@ pub fn price_call_fft_enhanced(
 
 /// Enhanced FFT‐based put pricing with automatic parameter optimization
 #[pyfunction]
+#[pyo3(signature = (s, k, tau, r, sigma, q=0.0))]
 pub fn price_put_fft_optimized(
     s: f64,
     k: f64,
     tau: f64,
     r: f64,
     sigma: f64,
+    q: f64,
 ) -> PyResult<f64> {
-    // Get call price using optimized parameters
-    let call_price = price_call_fft_optimized(s, k, tau, r, sigma)?;
-    
-    // Apply put-call parity
+    let call_price = price_call_fft_optimized(s, k, tau, r, sigma, q)?;
+
+    // Put–call parity with dividends: P = C − S e^{−qτ} + K e^{−rτ}
     let discount = (-r * tau).exp();
-    let put_price = call_price - s + k * discount;
+    let put_price = call_price - s * (-q * tau).exp() + k * discount;
     
     // Return non-negative price
     Ok(put_price.max(0.0))
@@ -306,6 +311,8 @@ pub fn price_put_fft_optimized(
 
 /// Enhanced FFT‐based put pricing with stability checks
 #[pyfunction]
+#[pyo3(signature = (s, k, k_min, delta_v, delta_k, n, tau, r, sigma, alpha, q=0.0))]
+#[allow(clippy::too_many_arguments)]
 pub fn price_put_fft_enhanced(
     s: f64,
     k: f64,
@@ -317,13 +324,13 @@ pub fn price_put_fft_enhanced(
     r: f64,
     sigma: f64,
     alpha: f64,
+    q: f64,
 ) -> PyResult<f64> {
-    // Get call price using enhanced method
-    let call_price = price_call_fft_enhanced(s, k, k_min, delta_v, delta_k, n, tau, r, sigma, alpha)?;
-    
-    // Apply put-call parity: P = C - S + K*exp(-r*tau)
+    let call_price = price_call_fft_enhanced(s, k, k_min, delta_v, delta_k, n, tau, r, sigma, alpha, q)?;
+
+    // Put–call parity with dividends: P = C − S e^{−qτ} + K e^{−rτ}
     let discount = (-r * tau).exp();
-    let put_price = call_price - s + k * discount;
+    let put_price = call_price - s * (-q * tau).exp() + k * discount;
     
     Ok(put_price.max(0.0))
 }

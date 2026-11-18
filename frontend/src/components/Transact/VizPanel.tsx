@@ -39,6 +39,7 @@ const getIcon = (viz: VizOption) => {
 };
 
 export const VizPanel = ({ open, onClose, selectedAssets, selectedViz, onSelectViz }: VizPanelProps) => {
+  const { dataProvider } = useDataProvider();
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [timeframe, setTimeframe] = useState<string>('1mo');

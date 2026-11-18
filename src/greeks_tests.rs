@@ -20,7 +20,7 @@ mod greeks_property_tests {
             prop_assume!(sigma <= 0.8); // Reasonable volatility range
             
             // Test call delta bounds and monotonicity
-            let call_greeks = calculate_bs_call_greeks(s, k, tau, r, sigma);
+            let call_greeks = calculate_bs_call_greeks(s, k, tau, r, sigma, 0.0);
             if let Ok(greeks) = call_greeks {
                 // Delta bounds for calls: 0 <= delta <= 1
                 prop_assert!(
@@ -30,7 +30,7 @@ mod greeks_property_tests {
                 
                 // Test monotonicity: delta should increase with spot price
                 let s_higher = s * 1.01; // 1% higher spot
-                let greeks_higher = calculate_bs_call_greeks(s_higher, k, tau, r, sigma);
+                let greeks_higher = calculate_bs_call_greeks(s_higher, k, tau, r, sigma, 0.0);
                 if let Ok(greeks_h) = greeks_higher {
                     prop_assert!(
                         greeks_h.delta >= greeks.delta,
@@ -41,7 +41,7 @@ mod greeks_property_tests {
             }
             
             // Test put delta bounds and monotonicity
-            let put_greeks = calculate_bs_put_greeks(s, k, tau, r, sigma);
+            let put_greeks = calculate_bs_put_greeks(s, k, tau, r, sigma, 0.0);
             if let Ok(greeks) = put_greeks {
                 // Delta bounds for puts: -1 <= delta <= 0
                 prop_assert!(
@@ -51,7 +51,7 @@ mod greeks_property_tests {
                 
                 // Test monotonicity: put delta should increase (become less negative) with spot price
                 let s_higher = s * 1.01;
-                let greeks_higher = calculate_bs_put_greeks(s_higher, k, tau, r, sigma);
+                let greeks_higher = calculate_bs_put_greeks(s_higher, k, tau, r, sigma, 0.0);
                 if let Ok(greeks_h) = greeks_higher {
                     prop_assert!(
                         greeks_h.delta >= greeks.delta,
@@ -79,7 +79,7 @@ mod greeks_property_tests {
             prop_assume!(sigma <= 0.8);
             
             // Test call gamma non-negativity
-            let call_greeks = calculate_bs_call_greeks(s, k, tau, r, sigma);
+            let call_greeks = calculate_bs_call_greeks(s, k, tau, r, sigma, 0.0);
             if let Ok(greeks) = call_greeks {
                 prop_assert!(
                     greeks.gamma >= 0.0,
@@ -103,7 +103,7 @@ mod greeks_property_tests {
             }
             
             // Test put gamma non-negativity (same as call gamma)
-            let put_greeks = calculate_bs_put_greeks(s, k, tau, r, sigma);
+            let put_greeks = calculate_bs_put_greeks(s, k, tau, r, sigma, 0.0);
             if let Ok(greeks) = put_greeks {
                 prop_assert!(
                     greeks.gamma >= 0.0,
@@ -144,8 +144,8 @@ mod greeks_property_tests {
             prop_assume!((s/k).ln().abs() < 0.5); // Avoid extreme moneyness for better numerical stability
             
             // Test call Greeks consistency
-            let analytical_call = calculate_bs_call_greeks(s, k, tau, r, sigma);
-            let numerical_call = calculate_numerical_call_greeks(s, k, tau, r, sigma);
+            let analytical_call = calculate_bs_call_greeks(s, k, tau, r, sigma, 0.0);
+            let numerical_call = calculate_numerical_call_greeks(s, k, tau, r, sigma, 0.0);
             
             if let (Ok(analytical), Ok(numerical)) = (analytical_call, numerical_call) {
                 // Delta consistency (should be within 0.1%)
@@ -190,8 +190,8 @@ mod greeks_property_tests {
             }
             
             // Test put Greeks consistency
-            let analytical_put = calculate_bs_put_greeks(s, k, tau, r, sigma);
-            let numerical_put = calculate_numerical_put_greeks(s, k, tau, r, sigma);
+            let analytical_put = calculate_bs_put_greeks(s, k, tau, r, sigma, 0.0);
+            let numerical_put = calculate_numerical_put_greeks(s, k, tau, r, sigma, 0.0);
             
             if let (Ok(analytical), Ok(numerical)) = (analytical_put, numerical_put) {
                 // Similar consistency checks for puts
@@ -229,8 +229,8 @@ mod greeks_property_tests {
         let r = 0.05;
         let sigma = 0.2;
         
-        let call_greeks = calculate_bs_call_greeks(s, k, tau, r, sigma).unwrap();
-        let put_greeks = calculate_bs_put_greeks(s, k, tau, r, sigma).unwrap();
+        let call_greeks = calculate_bs_call_greeks(s, k, tau, r, sigma, 0.0).unwrap();
+        let put_greeks = calculate_bs_put_greeks(s, k, tau, r, sigma, 0.0).unwrap();
         
         // ATM call delta should be around 0.5 (slightly higher due to drift)
         assert!(call_greeks.delta > 0.45 && call_greeks.delta < 0.65, 
@@ -258,20 +258,20 @@ mod greeks_property_tests {
         
         // Deep ITM call (low strike)
         let k_itm = 70.0;
-        let itm_call = calculate_bs_call_greeks(s, k_itm, tau, r, sigma).unwrap();
+        let itm_call = calculate_bs_call_greeks(s, k_itm, tau, r, sigma, 0.0).unwrap();
         assert!(itm_call.delta > 0.8, "Deep ITM call delta should be high, got {}", itm_call.delta);
         
         // Deep OTM call (high strike)
         let k_otm = 130.0;
-        let otm_call = calculate_bs_call_greeks(s, k_otm, tau, r, sigma).unwrap();
+        let otm_call = calculate_bs_call_greeks(s, k_otm, tau, r, sigma, 0.0).unwrap();
         assert!(otm_call.delta < 0.2, "Deep OTM call delta should be low, got {}", otm_call.delta);
         
         // Deep ITM put (high strike)
-        let itm_put = calculate_bs_put_greeks(s, k_otm, tau, r, sigma).unwrap();
+        let itm_put = calculate_bs_put_greeks(s, k_otm, tau, r, sigma, 0.0).unwrap();
         assert!(itm_put.delta < -0.8, "Deep ITM put delta should be very negative, got {}", itm_put.delta);
         
         // Deep OTM put (low strike)
-        let otm_put = calculate_bs_put_greeks(s, k_itm, tau, r, sigma).unwrap();
+        let otm_put = calculate_bs_put_greeks(s, k_itm, tau, r, sigma, 0.0).unwrap();
         assert!(otm_put.delta > -0.2, "Deep OTM put delta should be close to zero, got {}", otm_put.delta);
     }
     
@@ -286,8 +286,8 @@ mod greeks_property_tests {
         let tau_long = 1.0;
         let tau_short = 0.1;
         
-        let long_call = calculate_bs_call_greeks(s, k, tau_long, r, sigma).unwrap();
-        let short_call = calculate_bs_call_greeks(s, k, tau_short, r, sigma).unwrap();
+        let long_call = calculate_bs_call_greeks(s, k, tau_long, r, sigma, 0.0).unwrap();
+        let short_call = calculate_bs_call_greeks(s, k, tau_short, r, sigma, 0.0).unwrap();
         
         // Gamma should be higher for shorter time (more convexity near expiration)
         assert!(short_call.gamma > long_call.gamma, 
@@ -313,7 +313,7 @@ mod greeks_property_tests {
         let r = 0.05;
         let sigma = 0.2;
         
-        let greeks = calculate_bs_call_greeks(s, k, tau, r, sigma).unwrap();
+        let greeks = calculate_bs_call_greeks(s, k, tau, r, sigma, 0.0).unwrap();
         
         // All Greeks should be finite
         assert!(greeks.delta.is_finite(), "Delta should be finite");
