@@ -33,3 +33,19 @@ agenticskills/*.pdf
 
 # Any stray PDFs at repo root level
 /*.pdf
+
+# Generated / local artefacts
+*.log
+*.pdb
+*_tmp.html
+.hypothesis/
+proptest-regressions/
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+wheels/
+*.whl
+
+# Frontend build output (Vercel builds from source)
+frontend/dist/

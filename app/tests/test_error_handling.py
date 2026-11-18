@@ -17,7 +17,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from error_handling import (
+from app.error_handling import (
     ErrorSeverity, ErrorCategory, ErrorContext, DiagnosticInfo,
     PricingEngineError, ValidationError, CalculationError, 
     NumericalInstabilityError, ExternalAPIError, SystemError,
@@ -437,7 +437,7 @@ class TestErrorHandlingIntegration:
         assert stats["error_counts_by_category"]["system"] == 1
         assert stats["recent_errors_count"] == 5
     
-    @patch('error_handling.logger')
+    @patch('app.error_handling.logger')
     def test_error_logging_levels(self, mock_logger):
         """Test that errors are logged at appropriate levels"""
         # Test different severity levels

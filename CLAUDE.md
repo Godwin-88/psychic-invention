@@ -38,8 +38,10 @@ make dev
 python -m venv venv
 source venv/Scripts/activate      # Windows (Git Bash)
 # source venv/bin/activate         # Linux / macOS
-pip install -r requirements.txt
-cd frontend && npm install
+pip install -r requirements-dev.txt     # runtime + test/lint tools
+# pip install -r requirements.txt       # runtime only (what the Docker image installs)
+# pip install -r requirements-optional.txt   # OpenBB, QuantLib, arch, networkx…
+cd frontend && npm ci
 
 # Optional: install OpenBB for broader data sources (large install)
 pip install openbb
@@ -49,6 +51,7 @@ pip install openbb
 ```bash
 maturin develop               # dev build (fast, unoptimised)
 maturin develop --release     # release build (production performance)
+maturin build --release       # abi3 wheel (Python >= 3.10) → target/wheels/
 ```
 > If Rust is unavailable the server falls back to `pricing_engine_mock.py` automatically.
 
@@ -70,8 +73,8 @@ npm run preview   # preview production build
 
 ### Testing
 ```bash
-# Python (all)
-pytest app/tests/ -v
+# Python (all) — config in pyproject.toml; live-server load tests need RUN_INTEGRATION=1
+pytest
 pytest app/tests/ -v --cov=app --cov-report=term-missing
 
 # Python (property-based only)
@@ -262,7 +265,10 @@ VITE_ENABLE_DEMO=true
 
 ## Deployment
 
-- **Backend** → Render.com (`render.yaml`). Build: install Rust + pip + maturin. Start: gunicorn + uvicorn workers.
+- **Docker** → `docker build -t pricing-engine .` (multi-stage: Rust builder → slim non-root runtime, `HEALTHCHECK`, gunicorn). Set `APP_ENV=production`, `WRITE_API_KEYS`, `ADMIN_API_KEYS`, `CORS_ORIGINS`; set `DATABASE_URL` before `WEB_CONCURRENCY` > 1.
+- **CI** → `.github/workflows/ci.yml`: Rust tests + clippy, wheel build + pytest (3.10, 3.12), pip-audit, frontend type-check/test/build, Docker build + smoke test.
+
+- **Backend** → Render.com (`render.yaml`). Build: `build.sh` (Rust toolchain → wheel → install). Start: gunicorn + uvicorn (1 worker until `DATABASE_URL` is set).
 - **Frontend** → Vercel (`vercel.json`). Static build: `npm run build` → `dist/`.
 
 ---

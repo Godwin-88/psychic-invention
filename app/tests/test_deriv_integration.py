@@ -16,8 +16,8 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from deriv_api_client import DerivAPIClient, MarketData, AssetClass
-from market_data_endpoints import get_deriv_client
+from app.deriv_api_client import DerivAPIClient, MarketData, AssetClass
+from app.market_data_endpoints import get_deriv_client
 
 
 class TestDerivAPIIntegration:
@@ -181,7 +181,7 @@ class TestMarketDataEndpoints:
     def test_endpoint_availability(self):
         """Test that market data endpoints are available"""
         # This test verifies that the endpoints can be imported
-        from market_data_endpoints import router
+        from app.market_data_endpoints import router
         
         # Check that router has the expected endpoints
         routes = [route.path for route in router.routes]

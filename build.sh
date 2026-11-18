@@ -1,32 +1,23 @@
-#!/bin/bash
-set -e  # Exit on error
+#!/usr/bin/env bash
+# Render (native Python environment) build: compile the Rust extension into a
+# wheel and install it with the runtime dependencies.
+set -euo pipefail
 
-echo "==> Starting build..."
-
-# Install Rust
-echo "==> Installing Rust..."
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-
-# Source cargo environment
-echo "==> Setting up Cargo environment..."
+echo "==> Installing Rust toolchain"
+if ! command -v cargo >/dev/null 2>&1; then
+  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+fi
 export PATH="$HOME/.cargo/bin:$PATH"
-export CARGO_HOME="$HOME/.cargo"
-
-# Verify Rust installation
-echo "==> Verifying Rust installation..."
 rustc --version
-cargo --version
 
-# Upgrade pip
-echo "==> Upgrading pip..."
-pip install --upgrade pip
+echo "==> Installing Python dependencies"
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt "maturin>=1.5,<2"
 
-# Install Python dependencies
-echo "==> Installing Python dependencies..."
-pip install -r requirements.txt
+echo "==> Building and installing the pricing_engine wheel"
+rm -rf dist/wheels
+maturin build --release --strip --out dist/wheels
+python -m pip install --force-reinstall dist/wheels/*.whl
 
-# Build Rust extension with maturin
-echo "==> Building Rust extension with maturin..."
-maturin develop --release
-
-echo "==> Build complete!"
+python -c "import pricing_engine; print('pricing_engine OK:', pricing_engine.price_call(100, 100, 1.0, 0.05, 0.2))"
+echo "==> Build complete"

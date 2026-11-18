@@ -18,9 +18,9 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from main import app
-from deriv_api_client import DerivAPIClient, MarketData, AssetClass
-from error_handling import ValidationError, CalculationError
+from app.main import app
+from app.deriv_api_client import DerivAPIClient, MarketData, AssetClass
+from app.error_handling import ValidationError, CalculationError
 
 
 class TestCompleteSystemIntegration:

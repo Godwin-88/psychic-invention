@@ -1,4 +1,0 @@
-# file: C:\Users\ThinkPad\Documents\Goddy's Project\psychic-invention\app\main.py
-# hypothesis_version: 6.148.8
-
-[2.0, 400, '*', '/', '/compare/models', '/greeks/call', '/greeks/call/heston', '/greeks/put', '/greeks/put/heston', '/health', '/health/detailed', '/health/errors', '/price/call/bs', '/price/call/fft', '/price/call/heston', '/price/put/bs', '/price/put/fft', '/price/put/heston', '/validate/feller', '1.0.0', 'Black-Scholes', 'FFT', 'FFT-Enhanced', 'FFT-Optimized', 'Heston', 'INFO', 'X-Process-Time', 'X-Request-ID', 'black_scholes', 'bs', 'call', 'condition_value', 'delta', 'description', 'error', 'explanation', 'fft', 'fft_optimized', 'gamma', 'greeks', 'http', 'json', 'k', 'message', 'method', 'model', 'numerical', 'option_type', 'parameters', 'price', 'prices', 'put', 'r', 'request_id', 'results', 'rho', 's', 'shutdown', 'sigma', 'tau', 'theta', 'threshold', 'vega']
