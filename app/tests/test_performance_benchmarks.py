@@ -452,17 +452,18 @@ class TestParallelProcessingPerformance:
         process = psutil.Process(os.getpid())
         initial_memory = process.memory_info().rss / 1024 / 1024  # MB
         
-        # Process large batch
-        start_time = time.perf_counter()
+        # Process large batch. gc.collect() runs every 100 iterations to
+        # surface leaks, but is excluded from the timing: a full collection's
+        # cost depends on everything else alive in the test process.
+        processing_time = 0.0
         for i in range(num_calculations):
             strike = 90 + (i % 100) * 0.2
+            t0 = time.perf_counter()
             pricing_engine.price_call(self.s, strike, self.tau, self.r, self.sigma)
-            
-            # Force garbage collection every 100 iterations
+            processing_time += (time.perf_counter() - t0) * 1000
+
             if i % 100 == 0:
                 gc.collect()
-        
-        processing_time = (time.perf_counter() - start_time) * 1000
         final_memory = process.memory_info().rss / 1024 / 1024  # MB
         memory_increase = final_memory - initial_memory
         
